@@ -1,0 +1,5 @@
+{
+  "name": "FlexiDraw Tournament System",
+  "description": "A rule-driven, constraint-based tournament draw system allowing user-defined entities, custom constraints, and strict/relaxed draw modes.",
+  "requestFramePermissions": []
+}
