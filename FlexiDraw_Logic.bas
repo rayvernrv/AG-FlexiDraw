@@ -128,7 +128,6 @@ Sub LoadDataFromSheets()
     ' -- LOAD RULES --
     Set ws = ThisWorkbook.Sheets("Rules")
     lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
-    ' It's okay if no rules exist, but let's check
     
     If lastRow >= 2 Then
         RuleCount = lastRow - 1
@@ -136,15 +135,11 @@ Sub LoadDataFromSheets()
         For i = 2 To lastRow
             AllRules(i - 1).Type = ws.Cells(i, 1).Value
             AllRules(i - 1).Attribute = ws.Cells(i, 2).Value
-            
-            ' For TEAM_LOCK, we just store the group name in 'Seeds' field as string
-            ' For others, we assume comma separated seeds or values
             If AllRules(i - 1).Type = "TEAM_LOCK" Then
                 AllRules(i - 1).Seeds = ws.Cells(i, 3).Value
             Else
                 AllRules(i - 1).Seeds = "," & Replace(ws.Cells(i, 3).Value, " ", "") & ","
             End If
-            
             AllRules(i - 1).MaxCount = CInt(ws.Cells(i, 4).Value)
             AllRules(i - 1).IsActive = ws.Cells(i, 5).Value
         Next i
@@ -153,40 +148,28 @@ Sub LoadDataFromSheets()
     End If
 End Sub
 
-' --- SOLVER LOGIC ---
-
 Function SolveDraw(teamIndex As Integer) As Boolean
-    ' Base Case
     If teamIndex > TeamCount Then
         SolveDraw = True
         Exit Function
     End If
-    
     Dim i As Integer
-    
-    ' Try to place current team in each group
     For i = 1 To GroupCount
         If CheckConstraints(teamIndex, i) Then
-            ' Place
             With AllGroups(i)
                 .TeamCount = .TeamCount + 1
                 .TeamIndices(.TeamCount) = teamIndex
             End With
-            
-            ' Recurse
             If SolveDraw(teamIndex + 1) Then
                 SolveDraw = True
                 Exit Function
             End If
-            
-            ' Backtrack
             With AllGroups(i)
                 .TeamIndices(.TeamCount) = 0
                 .TeamCount = .TeamCount - 1
             End With
         End If
     Next i
-    
     SolveDraw = False
 End Function
 
@@ -194,32 +177,23 @@ Function CheckConstraints(teamIdx As Integer, groupIdx As Integer) As Boolean
     Dim g As Integer, t As Integer, r As Integer
     Dim currentTeam As Team
     Dim targetGroup As Group
-    
     currentTeam = AllTeams(teamIdx)
     targetGroup = AllGroups(groupIdx)
-    
-    ' 1. Capacity Check
     If targetGroup.TeamCount >= targetGroup.Capacity Then
         CheckConstraints = False
         Exit Function
     End If
-    
-    ' 2. Rule Checks
     For r = 1 To RuleCount
         If AllRules(r).IsActive Then
             Select Case AllRules(r).Type
-                
                 Case "TEAM_LOCK"
-                   ' Attribute = Team Name, Seeds = Group Name
                    If currentTeam.Name = AllRules(r).Attribute Then
                         If targetGroup.Name <> AllRules(r).Seeds Then
                             CheckConstraints = False
                             Exit Function
                         End If
                    End If
-
                 Case "MUTUAL_EXCLUSION"
-                    ' Check if any team in group has same attribute (Org)
                     If AllRules(r).Attribute = "organization" Then
                         For t = 1 To targetGroup.TeamCount
                             If AllTeams(targetGroup.TeamIndices(t)).Organization = currentTeam.Organization Then
@@ -228,11 +202,8 @@ Function CheckConstraints(teamIdx As Integer, groupIdx As Integer) As Boolean
                             End If
                         Next t
                     End If
-                    
                 Case "SEED_SEPARATION"
-                    ' If current team is a specific seed
                     If currentTeam.Seed > 0 And InStr(AllRules(r).Seeds, "," & currentTeam.Seed & ",") > 0 Then
-                        ' Check if group already has a restricted seed
                         For t = 1 To targetGroup.TeamCount
                             Dim existingSeed As Integer
                             existingSeed = AllTeams(targetGroup.TeamIndices(t)).Seed
@@ -242,11 +213,8 @@ Function CheckConstraints(teamIdx As Integer, groupIdx As Integer) As Boolean
                             End If
                         Next t
                     End If
-                    
                 Case "ZONE_SEPARATION"
-                    ' If current team is seed, and group has a zone
                     If currentTeam.Seed > 0 And targetGroup.Zone <> "" And InStr(AllRules(r).Seeds, "," & currentTeam.Seed & ",") > 0 Then
-                        ' Check ALL groups with same zone
                         For g = 1 To GroupCount
                             If AllGroups(g).Zone = targetGroup.Zone Then
                                 For t = 1 To AllGroups(g).TeamCount
@@ -260,46 +228,86 @@ Function CheckConstraints(teamIdx As Integer, groupIdx As Integer) As Boolean
                             End If
                         Next g
                     End If
-                    
             End Select
         End If
     Next r
-    
     CheckConstraints = True
 End Function
-
-' --- HELPERS ---
 
 Sub OutputToSheet()
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets.Add
-    ws.Name = "Results_" & Format(Now, "hhmmss")
+    ws.Name = "DrawResults_" & Format(Now, "hhmmss")
     
-    ws.Cells(1, 1).Value = "Group"
-    ws.Cells(1, 2).Value = "Zone"
-    ws.Cells(1, 3).Value = "Team"
-    ws.Cells(1, 4).Value = "Organization"
-    ws.Cells(1, 5).Value = "Seed"
+    Dim startRow As Integer, startCol As Integer
+    Dim g As Integer, t As Integer
     
-    Dim r As Integer, g As Integer, t As Integer
-    r = 2
+    startRow = 2
+    startCol = 2
+    
+    ' We will display 3 groups per row
+    Dim groupsPerRow As Integer: groupsPerRow = 3
+    Dim colOffset As Integer: colOffset = 5 ' Number of columns per group box
     
     For g = 1 To GroupCount
+        Dim currentGroupRow As Integer
+        Dim currentGroupCol As Integer
+        
+        currentGroupRow = startRow + (Int((g - 1) / groupsPerRow) * 12) ' Assume max 10 teams per group for spacing
+        currentGroupCol = startCol + (((g - 1) Mod groupsPerRow) * colOffset)
+        
+        ' --- Draw Header Box ---
+        With ws.Cells(currentGroupRow, currentGroupCol)
+            .Value = AllGroups(g).Name
+            .Font.Bold = True
+            .Interior.Color = RGB(220, 230, 241)
+            .HorizontalAlignment = xlCenter
+        End With
+        
+        ' Merge header across 3 columns
+        ws.Range(ws.Cells(currentGroupRow, currentGroupCol), ws.Cells(currentGroupRow, currentGroupCol + 2)).Merge
+        
+        ' Zone info below name
+        If AllGroups(g).Zone <> "" Then
+             With ws.Cells(currentGroupRow + 1, currentGroupCol)
+                .Value = "(" & AllGroups(g).Zone & ")"
+                .Font.Size = 8
+                .Font.Italic = True
+                .HorizontalAlignment = xlCenter
+             End With
+             ws.Range(ws.Cells(currentGroupRow + 1, currentGroupCol), ws.Cells(currentGroupRow + 1, currentGroupCol + 2)).Merge
+        End If
+        
+        ' Headers for the team table
+        ws.Cells(currentGroupRow + 2, currentGroupCol).Value = "Team"
+        ws.Cells(currentGroupRow + 2, currentGroupCol + 1).Value = "Org"
+        ws.Cells(currentGroupRow + 2, currentGroupCol + 2).Value = "Seed"
+        ws.Range(ws.Cells(currentGroupRow + 2, currentGroupCol), ws.Cells(currentGroupRow + 2, currentGroupCol + 2)).Font.Bold = True
+        ws.Range(ws.Cells(currentGroupRow + 2, currentGroupCol), ws.Cells(currentGroupRow + 2, currentGroupCol + 2)).Borders(xlEdgeBottom).LineStyle = xlContinuous
+        
+        ' List Teams
         For t = 1 To AllGroups(g).TeamCount
             Dim teamIdx As Integer
             teamIdx = AllGroups(g).TeamIndices(t)
             
-            ws.Cells(r, 1).Value = AllGroups(g).Name
-            ws.Cells(r, 2).Value = AllGroups(g).Zone
-            ws.Cells(r, 3).Value = AllTeams(teamIdx).Name
-            ws.Cells(r, 4).Value = AllTeams(teamIdx).Organization
-            If AllTeams(teamIdx).Seed > 0 Then ws.Cells(r, 5).Value = AllTeams(teamIdx).Seed
-            
-            r = r + 1
+            ws.Cells(currentGroupRow + 2 + t, currentGroupCol).Value = AllTeams(teamIdx).Name
+            ws.Cells(currentGroupRow + 2 + t, currentGroupCol + 1).Value = AllTeams(teamIdx).Organization
+            If AllTeams(teamIdx).Seed > 0 Then 
+                ws.Cells(currentGroupRow + 2 + t, currentGroupCol + 2).Value = AllTeams(teamIdx).Seed
+                ' Highlight seeds
+                ws.Cells(currentGroupRow + 2 + t, currentGroupCol + 2).Interior.Color = RGB(255, 255, 200)
+            End If
         Next t
+        
+        ' Box border around the group
+        Dim boxRange As Range
+        Set boxRange = ws.Range(ws.Cells(currentGroupRow, currentGroupCol), ws.Cells(currentGroupRow + 2 + AllGroups(g).Capacity, currentGroupCol + 2))
+        boxRange.BorderAround LineStyle:=xlContinuous, Weight:=xlThin
+        
     Next g
     
-    ws.Columns("A:E").AutoFit
+    ws.Columns.AutoFit
+    ws.Activate
 End Sub
 
 Sub ShuffleTeams()
@@ -315,31 +323,19 @@ Sub ShuffleTeams()
 End Sub
 
 Sub SortTeamsPriority()
-    ' Sorts by Lock status first, then Seed, then Random (from shuffle)
     Dim i As Integer, j As Integer
     Dim temp As Team
-    
     For i = 1 To TeamCount - 1
         For j = i + 1 To TeamCount
-            Dim scoreA As Integer, scoreB As Integer
-            scoreA = 0
-            scoreB = 0
-            
-            ' Determine if team A is locked
+            Dim scoreA As Integer: scoreA = 0
+            Dim scoreB As Integer: scoreB = 0
             Dim r As Integer
             For r = 1 To RuleCount
-                If AllRules(r).Type = "TEAM_LOCK" And AllRules(r).Attribute = AllTeams(i).Name Then
-                    scoreA = scoreA + 100
-                End If
-                If AllRules(r).Type = "TEAM_LOCK" And AllRules(r).Attribute = AllTeams(j).Name Then
-                    scoreB = scoreB + 100
-                End If
+                If AllRules(r).Type = "TEAM_LOCK" And AllRules(r).Attribute = AllTeams(i).Name Then scoreA = scoreA + 100
+                If AllRules(r).Type = "TEAM_LOCK" And AllRules(r).Attribute = AllTeams(j).Name Then scoreB = scoreB + 100
             Next r
-            
-            ' Determine Seed
             If AllTeams(i).Seed > 0 Then scoreA = scoreA + 10
-            If AllTeams(j).Seed > 0 Then scoreB = scoreB + 10
-            
+            if AllTeams(j).Seed > 0 Then scoreB = scoreB + 10
             If scoreB > scoreA Then
                 temp = AllTeams(i)
                 AllTeams(i) = AllTeams(j)
