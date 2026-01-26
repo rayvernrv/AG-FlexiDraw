@@ -98,3 +98,44 @@ Fill in the newly created sheets:
 ## ⚠️ Important Notes
 *   **Capacity Mismatch:** The VBA will throw an error if your total teams do not match the total group capacity.
 *   **Saving:** Always save your Excel file as **Excel Macro-Enabled Workbook (.xlsm)** to keep the code.
+
+---
+
+## 🛠️ Project Setup (Developer Guide)
+
+### Installation
+
+1.  Clone the repository.
+2.  Install dependencies:
+    ```bash
+    npm install
+    ```
+
+### Running Locally
+
+To start the development server:
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+
+### Building for Production
+
+To build the application for deployment:
+```bash
+npm run build
+```
+The output will be in the `dist` folder.
+
+### Deployment (GitHub Actions)
+
+This project is configured to automatically deploy to **GitHub Pages** on push to the `main` branch.
+
+**Prerequisites:**
+1.  Go to your repository **Settings** > **Pages**.
+2.  Set the **Source** to "GitHub Actions".
+3.  Go to **Settings** > **Secrets and variables** > **Actions**.
+4.  Add a New Repository Secret:
+    *   **Name**: `GEMINI_API_KEY`
+    *   **Value**: Your Gemini API Key.
+
