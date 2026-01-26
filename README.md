@@ -117,7 +117,7 @@ To start the development server:
 ```bash
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+Open [http://localhost:3000](http://localhost:3000) (or [http://localhost:3001](http://localhost:3001) if port 3000 is occupied) to view it in the browser.
 
 ### Building for Production
 
@@ -125,7 +125,7 @@ To build the application for deployment:
 ```bash
 npm run build
 ```
-The output will be in the `dist` folder.
+The output will be in the `dist` folder. **Note:** The `vite.config.ts` is configured with `base: './'` to ensure that assets are correctly resolved when deployed to subdirectories (e.g., GitHub Pages).
 
 ### Deployment (GitHub Actions)
 
@@ -138,3 +138,9 @@ This project is configured to automatically deploy to **GitHub Pages** on push t
 4.  Add a New Repository Secret:
     *   **Name**: `GEMINI_API_KEY`
     *   **Value**: Your Gemini API Key.
+
+---
+
+## ✅ Project Verification
+
+For a detailed walkthrough of the local execution and feature verification, refer to [PROJECT_VERIFICATION.md](./PROJECT_VERIFICATION.md).
