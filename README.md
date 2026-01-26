@@ -138,5 +138,3 @@ This project is configured to automatically deploy to **GitHub Pages** on push t
 4.  Add a New Repository Secret:
     *   **Name**: `GEMINI_API_KEY`
     *   **Value**: Your Gemini API Key.
-
-    
