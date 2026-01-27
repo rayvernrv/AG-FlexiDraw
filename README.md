@@ -1,4 +1,4 @@
-# FlexiDraw Tournament System
+# AG-FlexiDraw Tournament System
 
 FlexiDraw is a powerful, constraint-based tournament draw generator designed for sports tournaments (like Badminton, Tennis, Pickleball) where complex rules regarding organization separation, seeding, and zone distribution are required.
 
