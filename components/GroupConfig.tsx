@@ -9,7 +9,7 @@ interface GroupConfigProps {
 }
 
 export const GroupConfig: React.FC<GroupConfigProps> = ({ groups, setGroups, totalTeams, bracket }) => {
-  
+
   const totalCapacity = groups.reduce((sum, g) => sum + g.capacity, 0);
   const isCapacityMatch = totalCapacity === totalTeams;
 
@@ -43,7 +43,7 @@ export const GroupConfig: React.FC<GroupConfigProps> = ({ groups, setGroups, tot
           <div>
             <p className="font-bold text-red-800 text-sm">Capacity Mismatch Detected</p>
             <p className="text-red-700 text-xs">
-              Total Teams ({totalTeams}) must match Total Capacity ({totalCapacity}). 
+              Total Teams ({totalTeams}) must match Total Capacity ({totalCapacity}).
               Please adjust your groups before proceeding to Brackets or Results.
             </p>
           </div>
@@ -77,7 +77,7 @@ export const GroupConfig: React.FC<GroupConfigProps> = ({ groups, setGroups, tot
       <div className="bg-white p-4 rounded-lg shadow border border-slate-200">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-slate-800">Groups Configuration</h3>
-          <button 
+          <button
             onClick={addGroup}
             className="bg-brand-600 text-white px-3 py-1 rounded text-sm hover:bg-brand-700"
           >
@@ -88,16 +88,16 @@ export const GroupConfig: React.FC<GroupConfigProps> = ({ groups, setGroups, tot
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {groups.map((group) => (
             <div key={group.id} className="border border-slate-200 rounded p-3 relative hover:border-brand-300 transition bg-slate-50">
-              <button 
+              <button
                 onClick={() => removeGroup(group.id)}
                 className="absolute top-2 right-2 text-slate-400 hover:text-red-500"
               >
                 &times;
               </button>
-              
+
               <div className="mb-2">
                 <label className="block text-xs text-slate-500 mb-1">Group Name</label>
-                <input 
+                <input
                   type="text"
                   className="w-full p-1 border border-slate-300 rounded text-sm"
                   value={group.name}
@@ -107,7 +107,7 @@ export const GroupConfig: React.FC<GroupConfigProps> = ({ groups, setGroups, tot
 
               <div className="mb-2">
                 <label className="block text-xs text-slate-500 mb-1">Zone / Bracket</label>
-                <select 
+                <select
                   className="w-full p-1 border border-slate-300 rounded text-sm bg-slate-50"
                   value={group.zone || ''}
                   onChange={(e) => updateGroup(group.id, { zone: e.target.value })}
@@ -121,17 +121,18 @@ export const GroupConfig: React.FC<GroupConfigProps> = ({ groups, setGroups, tot
 
               <div>
                 <label className="block text-xs text-slate-500 mb-1">Capacity</label>
-                <input 
+                <input
                   type="number"
                   className={`w-full p-1 border rounded text-sm ${!isCapacityMatch ? 'border-red-300 bg-red-50' : 'border-slate-300'}`}
                   value={group.capacity}
                   onChange={(e) => updateGroup(group.id, { capacity: parseInt(e.target.value) || 0 })}
+                  onFocus={(e) => e.target.select()}
                 />
               </div>
             </div>
           ))}
         </div>
-        
+
         <p className="text-xs text-slate-400 mt-4 text-right">Configure available zones in the <strong>Brackets</strong> tab.</p>
       </div>
     </div>

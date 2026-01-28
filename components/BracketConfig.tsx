@@ -18,7 +18,7 @@ const TOURNAMENT_STAGES = [
 ];
 
 export const BracketConfig: React.FC<BracketConfigProps> = ({ bracket, setBracket, groups, setGroups }) => {
-  
+
   const toggleGroupZone = (groupId: string, zoneName: string, isSelected: boolean) => {
     setGroups(groups.map(g => {
       if (g.id !== groupId) return g;
@@ -29,11 +29,11 @@ export const BracketConfig: React.FC<BracketConfigProps> = ({ bracket, setBracke
   const handleStageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const stage = TOURNAMENT_STAGES.find(s => s.value === e.target.value);
     if (stage) {
-        setBracket({
-            ...bracket,
-            name: stage.label,
-            zones: stage.zones
-        });
+      setBracket({
+        ...bracket,
+        name: stage.label,
+        zones: stage.zones
+      });
     }
   };
 
@@ -41,44 +41,45 @@ export const BracketConfig: React.FC<BracketConfigProps> = ({ bracket, setBracke
 
   return (
     <div className="space-y-8">
-      
+
       {/* Configuration Section */}
       <div className="bg-white p-6 rounded-lg shadow border border-slate-200">
         <h3 className="text-lg font-bold text-slate-800 mb-4">1. Post-Group Stage Structure</h3>
         <p className="text-sm text-slate-500 mb-4">Define how the tournament proceeds after the group stage.</p>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-          
+
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Advancing Teams per Group</label>
             <div className="flex items-center gap-2">
-                <input 
-                    type="number" 
-                    min="1"
-                    className="w-20 p-2 border border-slate-300 rounded"
-                    value={bracket.advancingPerGroup || 2}
-                    onChange={(e) => setBracket({...bracket, advancingPerGroup: parseInt(e.target.value) || 1})}
-                />
-                <span className="text-sm text-slate-500">teams qualify from each group</span>
+              <input
+                type="number"
+                min="1"
+                className="w-20 p-2 border border-slate-300 rounded"
+                value={bracket.advancingPerGroup || 2}
+                onChange={(e) => setBracket({ ...bracket, advancingPerGroup: parseInt(e.target.value) || 1 })}
+                onFocus={(e) => e.target.select()}
+              />
+              <span className="text-sm text-slate-500">teams qualify from each group</span>
             </div>
             <p className="text-xs text-slate-400 mt-1">
-                Total qualifiers: {groups.length * (bracket.advancingPerGroup || 2)} teams
+              Total qualifiers: {groups.length * (bracket.advancingPerGroup || 2)} teams
             </p>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Elimination Stage Starts At:</label>
-            <select 
-                className="w-full p-2 border border-slate-300 rounded bg-white"
-                value={currentStageValue}
-                onChange={handleStageChange}
+            <select
+              className="w-full p-2 border border-slate-300 rounded bg-white"
+              value={currentStageValue}
+              onChange={handleStageChange}
             >
-                {TOURNAMENT_STAGES.map(s => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
-                ))}
+              {TOURNAMENT_STAGES.map(s => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
             </select>
             <div className="mt-2 text-xs text-slate-500">
-                This creates <strong>{bracket.zones.length}</strong> separate zones for seed separation logic.
+              This creates <strong>{bracket.zones.length}</strong> separate zones for seed separation logic.
             </div>
           </div>
         </div>
@@ -88,8 +89,8 @@ export const BracketConfig: React.FC<BracketConfigProps> = ({ bracket, setBracke
       <div className="bg-white p-6 rounded-lg shadow border border-slate-200">
         <h3 className="text-lg font-bold text-slate-800 mb-1">2. Map Groups to Bracket Zones</h3>
         <p className="text-sm text-slate-500 mb-6">
-            Assign which Groups feed into which part of the bracket. 
-            <br/><span className="italic">Use the <strong>"Seed Bracket Separation"</strong> rule to ensure top seeds don't meet until the final of these zones.</span>
+          Assign which Groups feed into which part of the bracket.
+          <br /><span className="italic">Use the <strong>"Seed Bracket Separation"</strong> rule to ensure top seeds don't meet until the final of these zones.</span>
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -107,17 +108,16 @@ export const BracketConfig: React.FC<BracketConfigProps> = ({ bracket, setBracke
                   {groups.map((group) => {
                     const isAssignedToThis = group.zone === zoneName;
                     const isAssignedElsewhere = group.zone && group.zone !== zoneName;
-                    
+
                     return (
-                      <label 
-                        key={group.id} 
-                        className={`flex items-center p-2 rounded border transition ${
-                          isAssignedToThis 
-                            ? 'bg-white border-brand-300 shadow-sm' 
-                            : isAssignedElsewhere 
-                              ? 'opacity-50 grayscale border-transparent' 
+                      <label
+                        key={group.id}
+                        className={`flex items-center p-2 rounded border transition ${isAssignedToThis
+                            ? 'bg-white border-brand-300 shadow-sm'
+                            : isAssignedElsewhere
+                              ? 'opacity-50 grayscale border-transparent'
                               : 'bg-white border-transparent hover:border-slate-300'
-                        }`}
+                          }`}
                       >
                         <input
                           type="checkbox"
