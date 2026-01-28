@@ -1,8 +1,10 @@
 # AG-FlexiDraw Tournament System
 
-FlexiDraw is a powerful, constraint-based tournament draw generator designed for sports tournaments (like Badminton, Tennis, Pickleball) where complex rules regarding organization separation, seeding, and zone distribution are required.
+FlexiDraw is a powerful, highly customizable tournament draw generator designed for sports tournaments (like Badminton, Tennis, Football etc) where complex rules regarding organization separation, seeding, and zone distribution are required. Two features that make it stand out are:
+1. **Group Stage Draw:** Traditional tournament structure with groups and knockout rounds.
+2. **Direct Bracket Elimination:** Skip groups and go straight to a knockout bracket.
 
-It consists of two parts:
+This draw generator consists of two parts:
 1. **The Web Application:** A visual interface to configure and run draws instantly.
 2. **The VBA Engine:** A downloadable logic script that allows you to run the exact same draw logic locally within Microsoft Excel.
 
@@ -10,36 +12,59 @@ It consists of two parts:
 
 ## 📖 Web Application User Guide
 
-### 1. Teams & Orgs Tab
-This is where you input your participants.
+### 1. Teams & Orgs Tab (Common)
+This is the starting point for both draw modes.
 *   **Manual Entry:** Enter an Organization name (e.g., "Club A") and a count (e.g., 2 teams) to batch-create teams.
 *   **Import CSV:** You can upload a `.csv` file with the headers: `Name, Organization, Seed`.
-    *   *Note:* Seed is optional. Leave blank for unseeded teams.
-*   **Duplicate Handling:** The system automatically detects duplicate entries (same Name + Organization) and offers a "Remove Duplicates" button.
-*   **Actions:** You can edit names/seeds inline or delete specific teams.
+*   **Duplicate Handling:** The system automatically detects duplicate entries and offers a "Remove Duplicates" button.
+*   **Actions:** Edit names/seeds inline or delete specific teams.
 
-### 2. Groups Tab
-Configure the containers for your teams.
-*   **Auto-Distribute:** In the "Teams" tab, use the "Generate Groups" button to auto-create groups based on team count.
-*   **Capacity Check:** The system enforces that Total Team Count must match Total Group Capacity. You cannot proceed to the Draw until these match.
-*   **Zones:** Assign groups to specific "Zones" (e.g., Top Half, Bottom Half). This is crucial for the "Zone Separation" rule (preventing top seeds from meeting until the finals).
+---
 
-### 3. Brackets Tab
-Define the stage *after* the groups.
+### 📊 Mode Selection: Group Stage Draw
+*Select this mode in the sidebar for traditional tournament structures (Groups -> Knockout).*
+
+#### 2. Groups Tab
+*   **Auto-Distribute:** Use "Generate Groups" in the Teams tab to auto-create groups.
+*   **Capacity Check:** Total Team Count must match Total Group Capacity.
+*   **Zones:** Assign groups to "Zones" (Top/Bottom Half) for later bracket seeding rules.
+
+#### 3. Brackets Tab
 *   **Advancing Teams:** Set how many teams move on from each group (e.g., Top 2).
-*   **Zone Mapping:** Map your Groups to Bracket Zones (e.g., Groups A & B -> Top Half). This visual interface ensures you have balanced bracket halves.
+*   **Zone Mapping:** Map your Groups to Bracket Zones (e.g., Group A -> Top Half).
 
-### 4. Rules Tab
-The heart of the system. Toggle constraints on/off.
-*   **Attribute Exclusion:** Prevents teams from the same Organization from landing in the same group.
-*   **Seed Group Separation:** Ensures specific seeds (e.g., 1 & 2) never meet in the group stage.
-*   **Seed Zone Separation:** Ensures specific seeds (e.g., 1 & 2) are placed in opposite halves of the bracket (e.g., Seed 1 in Group A [Top Half], Seed 2 in Group D [Bottom Half]).
-*   **Team Lock:** Forces a specific team into a specific group (useful for Host teams or fixed slots).
+#### 4. Rules Stage
+*   **Attribute Exclusion:** Prevent teams from the same Org in the same group.
+*   **Seed Separation:** Prevent seeds 1 & 2 from meeting in the group stage.
+*   **Seed Zone Separation:** Force seeds 1 & 2 into opposite halves of the bracket.
+*   **Team Lock:** Force a team into a specific group.
 
-### 5. Results (Run Draw) Tab
-*   **Run Draw:** Triggers the randomization and backtracking algorithm to find a valid solution.
-*   **Export CSV:** Downloads the results in a simple format.
-*   **Export Excel Macro (VBA):** Downloads the logic script to run this offline.
+---
+
+### 🏆 Mode Selection: Direct Bracket Elimination
+*Select this mode in the sidebar to skip groups and go straight to a knockout bracket.*
+
+#### 2. Bracket Setup Tab
+*   **Starting Round:** Select bracket size (Round of 32, 16, Quarter-Finals, etc.).
+*   **Slot Assignment:** 
+    *   **Manual Placement:** Assign specific teams to specific bracket slots.
+    *   **Fixed/Lock:** Click 🔓/🔒 to lock a team to a slot. Fixed teams stay put during the random draw.
+*   **Capacity Validation:** Team count must match the selected bracket size.
+
+#### 3. Rules Stage
+*   **Half Separation:** Ensure specific teams are in different halves (Top/Bottom), preventing them from meeting until the Final.
+*   **Team Lock:** Force a team into a specific bracket slot.
+
+---
+
+### 🏁 Results & Export (Common)
+*   **Run Draw:** Triggers the randomization algorithm.
+*   **Visual View:** 
+    *   *Group Mode:* Shows organized group tables.
+    *   *Elimination Mode:* Shows a visual tournament bracket/tree.
+*   **Export Options:**
+    *   **CSV:** Standard spreadsheet result.
+    *   **Excel VBA (Group Mode only):** Download the logic script for offline Excel use.
 
 ---
 
