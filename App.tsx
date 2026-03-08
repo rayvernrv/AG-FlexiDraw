@@ -400,7 +400,7 @@ const App = () => {
                                       <div className="font-medium text-slate-800">{t.name}</div>
                                       <div className="text-xs text-slate-500">{t.organization}</div>
                                     </div>
-                                    {t.seed && (
+                                    {t.seed != null && t.seed > 0 && (
                                       <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full font-bold border border-yellow-200">
                                         Seed {t.seed}
                                       </span>

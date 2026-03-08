@@ -310,7 +310,10 @@ export const EntityConfig: React.FC<EntityConfigProps> = ({ teams, setTeams, set
                         className="bg-transparent border border-slate-200 rounded w-16 px-1 text-center"
                         value={team.seed || ''}
                         placeholder="-"
-                        onChange={(e) => updateTeam(team.id, { seed: e.target.value ? parseInt(e.target.value) : null })}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value);
+                          updateTeam(team.id, { seed: v > 0 ? v : null });
+                        }}
                         onFocus={(e) => e.target.select()}
                       />
                     </td>

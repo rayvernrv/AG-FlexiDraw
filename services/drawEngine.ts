@@ -9,7 +9,7 @@ const checkConstraints = (
   groupsState: Group[], // Need full state for zone checks
   rules: Rule[]
 ): { valid: boolean; reason?: string } => {
-  
+
   // 1. Capacity Check
   if (group.teams.length >= group.capacity) {
     return { valid: false, reason: `Group ${group.name} is full` };
@@ -22,13 +22,13 @@ const checkConstraints = (
       case RuleType.TEAM_LOCK: {
         // If this rule applies to the current team
         if (rule.params.teamId === team.id) {
-            // Then the current group MUST be the locked group
-            if (group.id !== rule.params.groupId) {
-                return {
-                    valid: false,
-                    reason: `Rule Violation: Team '${team.name}' is locked to a different group.`
-                };
-            }
+          // Then the current group MUST be the locked group
+          if (group.id !== rule.params.groupId) {
+            return {
+              valid: false,
+              reason: `Rule Violation: Team '${team.name}' is locked to a different group.`
+            };
+          }
         }
         break;
       }
@@ -36,16 +36,16 @@ const checkConstraints = (
       case RuleType.MUTUAL_EXCLUSION: {
         const attr = rule.params.attribute as keyof Team;
         if (!attr) continue;
-        
+
         // Check if any team currently in the group has the same attribute value
         const hasConflict = group.teams.some(
           (t) => t[attr] === team[attr] && t[attr] !== undefined
         );
-        
+
         if (hasConflict) {
-          return { 
-            valid: false, 
-            reason: `Rule Violation: Mutual Exclusion on '${attr}' (${team[attr]})` 
+          return {
+            valid: false,
+            reason: `Rule Violation: Mutual Exclusion on '${attr}' (${team[attr]})`
           };
         }
         break;
@@ -60,10 +60,10 @@ const checkConstraints = (
             (t) => t.seed && seedsToSeparate.includes(t.seed)
           );
           if (hasConflict) {
-             return { 
-               valid: false, 
-               reason: `Rule Violation: Seed Separation (${team.seed})` 
-             };
+            return {
+              valid: false,
+              reason: `Rule Violation: Seed Separation (${team.seed})`
+            };
           }
         }
         break;
@@ -76,17 +76,17 @@ const checkConstraints = (
           // Check all OTHER groups with the SAME zone to see if they contain a restricted seed
           for (const g of groupsState) {
             if (g.zone === group.zone) {
-               // Iterate teams in that group (could be the current group or another one in the zone)
-               const hasConflict = g.teams.some(
-                 (t) => t.seed && seedsToSeparate.includes(t.seed)
-               );
+              // Iterate teams in that group (could be the current group or another one in the zone)
+              const hasConflict = g.teams.some(
+                (t) => t.seed && seedsToSeparate.includes(t.seed)
+              );
 
-               if (hasConflict) {
-                 return {
-                   valid: false,
-                   reason: `Rule Violation: Zone Separation. Zone '${group.zone}' already contains a restricted seed.`
-                 };
-               }
+              if (hasConflict) {
+                return {
+                  valid: false,
+                  reason: `Rule Violation: Zone Separation. Zone '${group.zone}' already contains a restricted seed.`
+                };
+              }
             }
           }
         }
@@ -132,11 +132,19 @@ const solveDraw = (
   const currentTeam = teamsToPlace[0];
   const remainingTeams = teamsToPlace.slice(1);
 
-  // Try to place currentTeam in each group
-  for (const group of groups) {
+  // Shuffle group iteration order to produce varied results across runs
+  const shuffledGroupIndices = groups.map((_, i) => i);
+  for (let i = shuffledGroupIndices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffledGroupIndices[i], shuffledGroupIndices[j]] = [shuffledGroupIndices[j], shuffledGroupIndices[i]];
+  }
+
+  // Try to place currentTeam in each group (randomized order)
+  for (const idx of shuffledGroupIndices) {
+    const group = groups[idx];
     // Pass 'groups' (the full array) to allow cross-group checks (Zone Separation)
     const check = checkConstraints(currentTeam, group, groups, rules);
-    
+
     if (check.valid) {
       // PLACEMENT
       group.teams.push(currentTeam);
@@ -160,7 +168,7 @@ export const runDraw = (
   rules: Rule[]
 ): { success: boolean; groups: Group[]; logs: string[] } => {
   const start = Date.now();
-  
+
   // Deep copy to avoid mutating state directly during calculation
   const workingGroups: Group[] = groupsConfig.map(g => ({ ...g, teams: [] }));
   const workingTeams = [...teams];
@@ -176,15 +184,15 @@ export const runDraw = (
     // Check if team has a Lock rule
     const aLocked = rules.some(r => r.type === RuleType.TEAM_LOCK && r.params.teamId === a.id);
     const bLocked = rules.some(r => r.type === RuleType.TEAM_LOCK && r.params.teamId === b.id);
-    
+
     if (aLocked && !bLocked) return -1;
     if (!aLocked && bLocked) return 1;
 
     // Then priority: Has Seed
     if (a.seed !== null && b.seed === null) return -1;
     if (a.seed === null && b.seed !== null) return 1;
-    
-    return 0; 
+
+    return 0;
   });
 
   const success = solveDraw(workingTeams, workingGroups, rules, start, 2000); // 2s timeout
