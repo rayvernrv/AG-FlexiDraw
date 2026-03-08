@@ -77,3 +77,23 @@ export interface EliminationDrawResult {
   bracket: EliminationBracket;
   logs: string[];
 }
+
+// ==================== MATCHUP & SCHEDULE TYPES ====================
+
+export interface Matchup {
+  id: string;
+  groupId: string;
+  groupName: string;
+  teamA: Team;
+  teamB: Team;
+  round: number; // Which round-robin iteration (1, 2, ..., n)
+}
+
+export interface SavedMatchupSchedule {
+  id: string;
+  name: string;
+  createdAt: string;
+  groups: Group[];
+  matchups: Matchup[];
+  roundRobinCount: number;
+}

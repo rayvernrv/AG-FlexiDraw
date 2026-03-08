@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Team, Group, Rule, DrawResult, BracketDefinition, DrawMode, EliminationBracket, EliminationDrawResult, BracketSlot } from './types';
+import React, { useState, useEffect } from 'react';
+import { Team, Group, Rule, DrawResult, BracketDefinition, DrawMode, EliminationBracket, EliminationDrawResult, BracketSlot, Matchup, SavedMatchupSchedule } from './types';
 import { INITIAL_TEAMS, INITIAL_GROUPS, INITIAL_RULES } from './constants';
 import { EntityConfig } from './components/EntityConfig';
 import { GroupConfig } from './components/GroupConfig';
@@ -10,6 +10,8 @@ import { EliminationBracketView } from './components/EliminationBracketView';
 import { runDraw } from './services/drawEngine';
 import { runEliminationDraw } from './services/bracketDrawEngine';
 import { generateVBACode } from './services/vbaGenerator';
+import { generateMatchups } from './services/matchupEngine';
+import { saveMatchupSchedule, loadMatchupSchedules, deleteMatchupSchedule, updateMatchupSchedule } from './services/storageService';
 
 // Helper to generate initial elimination bracket
 const generateInitialEliminationBracket = (slotCount: number, roundName: string): EliminationBracket => ({
@@ -48,11 +50,26 @@ const App = () => {
   const [lastEliminationResult, setLastEliminationResult] = useState<EliminationDrawResult | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
+  // Matchup state
+  const [drawConfirmed, setDrawConfirmed] = useState(false);
+  const [roundRobinCount, setRoundRobinCount] = useState(1);
+  const [generatedMatchups, setGeneratedMatchups] = useState<Matchup[]>([]);
+  const [showRoundRobinPrompt, setShowRoundRobinPrompt] = useState(false);
+  const [savedSchedules, setSavedSchedules] = useState<SavedMatchupSchedule[]>([]);
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  const [editingScheduleName, setEditingScheduleName] = useState('');
+  const [saveName, setSaveName] = useState('');
+
   const totalCapacity = groups.reduce((sum, g) => sum + g.capacity, 0);
   const isGroupSetupValid = totalCapacity === teams.length;
   const isEliminationSetupValid = teams.length === eliminationBracket.totalSlots;
 
   const isSetupValid = drawMode === 'group' ? isGroupSetupValid : isEliminationSetupValid;
+
+  // Load saved schedules from localStorage on mount
+  useEffect(() => {
+    setSavedSchedules(loadMatchupSchedules());
+  }, []);
 
   const handleTabChange = (tabId: typeof activeTab) => {
     // For group mode, block transition from Groups if capacity is wrong
@@ -65,11 +82,13 @@ const App = () => {
 
   const handleDrawModeChange = (mode: DrawMode) => {
     setDrawMode(mode);
-    // Reset to teams tab when switching modes
     setActiveTab('teams');
-    // Clear previous results
     setLastResult(null);
     setLastEliminationResult(null);
+    // Reset matchup state
+    setDrawConfirmed(false);
+    setGeneratedMatchups([]);
+    setShowRoundRobinPrompt(false);
   };
 
   const handleDraw = async () => {
@@ -89,6 +108,10 @@ const App = () => {
           executionTimeMs: 0
         });
         setLastEliminationResult(null);
+        // Reset matchup state on new draw
+        setDrawConfirmed(false);
+        setGeneratedMatchups([]);
+        setShowRoundRobinPrompt(false);
       } else {
         const result = runEliminationDraw(teams, eliminationBracket, rules);
         setLastEliminationResult(result);
@@ -411,6 +434,230 @@ const App = () => {
                               </div>
                             </div>
                           ))}
+                        </div>
+                      )}
+
+                      {/* Confirm / Matchup Generation Flow */}
+                      {lastResult.success && !drawConfirmed && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+                          <p className="text-blue-800 font-semibold text-lg mb-2">Confirm this draw?</p>
+                          <p className="text-blue-600 text-sm mb-4">Once confirmed, you can generate matchup schedules.</p>
+                          <button
+                            onClick={() => {
+                              setDrawConfirmed(true);
+                              setShowRoundRobinPrompt(true);
+                            }}
+                            className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition"
+                          >
+                            ✓ Confirm Draw
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Round Robin Prompt */}
+                      {showRoundRobinPrompt && (
+                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
+                          <h4 className="font-bold text-purple-800 mb-2">How many times should teams play each other?</h4>
+                          <p className="text-purple-600 text-sm mb-4">
+                            1 = Single Round Robin &nbsp;|&nbsp; 2 = Double Round Robin &nbsp;|&nbsp; n = Custom
+                          </p>
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="number"
+                              min="1"
+                              max="10"
+                              className="w-20 p-2 border border-purple-300 rounded text-center text-lg font-bold"
+                              value={roundRobinCount}
+                              onChange={(e) => setRoundRobinCount(Math.max(1, parseInt(e.target.value) || 1))}
+                              onFocus={(e) => e.target.select()}
+                            />
+                            <button
+                              onClick={() => {
+                                if (lastResult?.success) {
+                                  const matchups = generateMatchups(lastResult.groups, roundRobinCount);
+                                  setGeneratedMatchups(matchups);
+                                  setShowRoundRobinPrompt(false);
+                                }
+                              }}
+                              className="bg-purple-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-purple-700 transition"
+                            >
+                              Generate Matchups
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Generated Matchups Display */}
+                      {generatedMatchups.length > 0 && (
+                        <div className="space-y-6">
+                          <div className="flex justify-between items-center">
+                            <h3 className="text-lg font-bold text-slate-800">
+                              Matchups ({roundRobinCount}x Round Robin)
+                            </h3>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                placeholder="Schedule name..."
+                                className="p-2 border border-slate-300 rounded text-sm"
+                                value={saveName}
+                                onChange={(e) => setSaveName(e.target.value)}
+                              />
+                              <button
+                                onClick={() => {
+                                  if (!saveName.trim()) {
+                                    alert('Please enter a name for this schedule.');
+                                    return;
+                                  }
+                                  if (!lastResult?.success) return;
+                                  const schedule: SavedMatchupSchedule = {
+                                    id: Math.random().toString(36).substring(2, 9),
+                                    name: saveName.trim(),
+                                    createdAt: new Date().toISOString(),
+                                    groups: lastResult.groups,
+                                    matchups: generatedMatchups,
+                                    roundRobinCount,
+                                  };
+                                  saveMatchupSchedule(schedule);
+                                  setSavedSchedules(loadMatchupSchedules());
+                                  setSaveName('');
+                                }}
+                                className="bg-green-600 text-white px-4 py-2 rounded text-sm font-semibold hover:bg-green-700 transition"
+                              >
+                                💾 Save
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Group matchups */}
+                          {lastResult?.success && lastResult.groups.map(g => {
+                            const groupMatchups = generatedMatchups.filter(m => m.groupId === g.id);
+                            if (groupMatchups.length === 0) return null;
+                            return (
+                              <div key={g.id} className="border border-slate-200 rounded-lg overflow-hidden">
+                                <div className="bg-slate-100 p-3 border-b border-slate-200">
+                                  <span className="font-bold text-slate-700">{g.name}</span>
+                                  <span className="text-xs text-slate-500 ml-2">({groupMatchups.length} matches)</span>
+                                </div>
+                                <div className="p-3 space-y-1 bg-white">
+                                  {Array.from({ length: roundRobinCount }, (_, roundIdx) => {
+                                    const roundMatchups = groupMatchups.filter(m => m.round === roundIdx + 1);
+                                    return (
+                                      <div key={roundIdx}>
+                                        {roundRobinCount > 1 && (
+                                          <p className="text-xs font-bold text-slate-400 uppercase mt-2 mb-1">Round {roundIdx + 1}</p>
+                                        )}
+                                        {roundMatchups.map(m => (
+                                          <div key={m.id} className="flex items-center p-2 hover:bg-slate-50 rounded text-sm">
+                                            <span className="font-medium text-slate-700 flex-1 text-right">{m.teamA.name}</span>
+                                            <span className="mx-3 text-slate-400 font-bold">vs</span>
+                                            <span className="font-medium text-slate-700 flex-1">{m.teamB.name}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Saved Schedules */}
+                      {savedSchedules.length > 0 && (
+                        <div className="border border-slate-200 rounded-lg overflow-hidden">
+                          <div className="bg-slate-100 p-3 border-b border-slate-200">
+                            <span className="font-bold text-slate-700">📁 Saved Schedules</span>
+                          </div>
+                          <div className="p-3 space-y-2 bg-white">
+                            {savedSchedules.map(s => (
+                              <div key={s.id} className="flex items-center justify-between p-3 bg-slate-50 rounded border border-slate-200 hover:border-slate-300 transition">
+                                {editingScheduleId === s.id ? (
+                                  <div className="flex items-center gap-2 flex-1">
+                                    <input
+                                      type="text"
+                                      className="p-1 border border-slate-300 rounded text-sm flex-1"
+                                      value={editingScheduleName}
+                                      onChange={(e) => setEditingScheduleName(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          updateMatchupSchedule(s.id, { name: editingScheduleName });
+                                          setSavedSchedules(loadMatchupSchedules());
+                                          setEditingScheduleId(null);
+                                        }
+                                      }}
+                                      autoFocus
+                                    />
+                                    <button
+                                      onClick={() => {
+                                        updateMatchupSchedule(s.id, { name: editingScheduleName });
+                                        setSavedSchedules(loadMatchupSchedules());
+                                        setEditingScheduleId(null);
+                                      }}
+                                      className="text-green-600 text-xs font-medium hover:underline"
+                                    >
+                                      Save
+                                    </button>
+                                    <button
+                                      onClick={() => setEditingScheduleId(null)}
+                                      className="text-slate-400 text-xs hover:underline"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div>
+                                      <p className="font-medium text-slate-800 text-sm">{s.name}</p>
+                                      <p className="text-xs text-slate-500">
+                                        {s.groups.length} groups · {s.matchups.length} matches · {s.roundRobinCount}x RR
+                                        <span className="ml-2">{new Date(s.createdAt).toLocaleDateString()}</span>
+                                      </p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <button
+                                        onClick={() => {
+                                          setGeneratedMatchups(s.matchups);
+                                          setRoundRobinCount(s.roundRobinCount);
+                                          setDrawConfirmed(true);
+                                          setShowRoundRobinPrompt(false);
+                                          setLastResult({
+                                            success: true,
+                                            groups: s.groups,
+                                            logs: [`Loaded schedule: ${s.name}`],
+                                            executionTimeMs: 0,
+                                          });
+                                        }}
+                                        className="text-blue-600 text-xs font-medium hover:underline"
+                                      >
+                                        Load
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setEditingScheduleId(s.id);
+                                          setEditingScheduleName(s.name);
+                                        }}
+                                        className="text-slate-500 text-xs font-medium hover:underline"
+                                      >
+                                        Rename
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          if (confirm(`Delete "${s.name}"?`)) {
+                                            deleteMatchupSchedule(s.id);
+                                            setSavedSchedules(loadMatchupSchedules());
+                                          }
+                                        }}
+                                        className="text-red-500 text-xs font-medium hover:underline"
+                                      >
+                                        Delete
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
