@@ -77,3 +77,78 @@ export interface EliminationDrawResult {
   bracket: EliminationBracket;
   logs: string[];
 }
+
+// ==================== MATCHUP & SCHEDULE TYPES ====================
+
+export interface Matchup {
+  id: string;
+  groupId: string;
+  groupName: string;
+  teamA: Team;
+  teamB: Team;
+  round: number; // Which round-robin iteration (1, 2, ..., n)
+}
+
+export interface SavedMatchupSchedule {
+  id: string;
+  name: string;
+  createdAt: string;
+  groups: Group[];
+  matchups: Matchup[];
+  roundRobinCount: number;
+}
+
+// ==================== RESULTS & RANKINGS TYPES ====================
+
+export interface GameCategory {
+  id: string;
+  name: string; // e.g. "Men Singles", "Women Doubles"
+  type: 'single_set' | 'best_of_3' | 'best_of_5';
+}
+
+export interface GameResult {
+  categoryId: string;
+  teamASets: number;
+  teamBSets: number;
+  teamAPoints: number;
+  teamBPoints: number;
+}
+
+export interface MatchResult {
+  matchupId: string;
+  games: GameResult[];
+  isComplete: boolean;
+  // Computed summaries for the match
+  teamAMatchWins: number;
+  teamBMatchWins: number;
+}
+
+export interface RankingEntry {
+  teamId: string;
+  teamName: string;
+  teamOrganization: string;
+  groupId: string;
+  groupName: string;
+
+  gamesPlayed: number;
+  gamesWon: number;
+  gamesLost: number;
+
+  setsWon: number;
+  setsLost: number;
+  setDifference: number;
+
+  totalPointsWon: number;
+  totalPointsLost: number;
+  totalPointsDifference: number;
+
+  deltaPointsPerGame: number;
+
+  tiebreakerNote?: string; // If resolved by H2H or needs manual checking
+}
+
+export interface RankingRule {
+  id: string;
+  field: 'gamesWonLostDiff' | 'setWonLostDiff' | 'totalPointsDifference' | 'deltaPointsPerGame' | 'headToHead';
+  direction: 'asc' | 'desc'; // Usually 'desc' for most points/wins
+}
