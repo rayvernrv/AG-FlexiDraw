@@ -12,6 +12,7 @@ import { runEliminationDraw } from './services/bracketDrawEngine';
 import { generateVBACode } from './services/vbaGenerator';
 import { generateMatchups } from './services/matchupEngine';
 import { saveMatchupSchedule, loadMatchupSchedules, deleteMatchupSchedule, updateMatchupSchedule } from './services/storageService';
+import { ResultsRankings } from './components/ResultsRankings';
 
 // Helper to generate initial elimination bracket
 const generateInitialEliminationBracket = (slotCount: number, roundName: string): EliminationBracket => ({
@@ -29,7 +30,7 @@ const App = () => {
   // Draw Mode: 'group' for traditional group stage, 'elimination' for direct bracket
   const [drawMode, setDrawMode] = useState<DrawMode>('group');
 
-  const [activeTab, setActiveTab] = useState<'teams' | 'groups' | 'brackets' | 'elimination' | 'rules' | 'draw'>('teams');
+  const [activeTab, setActiveTab] = useState<'teams' | 'groups' | 'brackets' | 'elimination' | 'rules' | 'draw' | 'results'>('teams');
 
   // State
   const [teams, setTeams] = useState<Team[]>(INITIAL_TEAMS);
@@ -191,7 +192,8 @@ const App = () => {
         { id: 'groups' as const, label: '2. Groups', count: groups.length },
         { id: 'brackets' as const, label: '3. Brackets', count: bracket.zones.length },
         { id: 'rules' as const, label: '4. Rules', count: rules.filter(r => r.isActive && r.type !== 'HALF_SEPARATION').length },
-        { id: 'draw' as const, label: 'Results', count: lastResult ? (lastResult.success ? '✓' : '✗') : '-' },
+        { id: 'draw' as const, label: '5. Draw', count: lastResult ? (lastResult.success ? '✓' : '✗') : '-' },
+        { id: 'results' as const, label: '6. Results & Rankings', count: savedSchedules.length },
       ];
     } else {
       return [
@@ -693,6 +695,10 @@ const App = () => {
                   )
                 )}
               </div>
+            )}
+
+            {activeTab === 'results' && drawMode === 'group' && (
+              <ResultsRankings />
             )}
 
           </div>
