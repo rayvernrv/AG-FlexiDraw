@@ -211,7 +211,7 @@ const App = () => {
     <div className="min-h-screen flex flex-col font-sans">
       {/* Header */}
       <header className="bg-slate-900 text-white p-4 shadow-lg sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+        <div className="w-full xl:max-w-[1400px] 2xl:max-w-full mx-auto flex items-center justify-between px-4">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-brand-500 rounded flex items-center justify-center font-bold text-lg">F</div>
             <h1 className="text-xl font-bold tracking-tight">FlexiDraw <span className="text-slate-400 font-normal text-sm ml-2">Tournament System</span></h1>
@@ -237,7 +237,7 @@ const App = () => {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 md:grid-cols-12 gap-6">
+      <main className="flex-1 w-full xl:max-w-[1400px] 2xl:max-w-full mx-auto p-4 md:p-6 grid grid-cols-1 md:grid-cols-12 gap-6">
 
         {/* Sidebar Nav */}
         <nav className="md:col-span-3 lg:col-span-2 space-y-1">
