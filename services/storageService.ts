@@ -1,6 +1,7 @@
-import { SavedMatchupSchedule } from '../types';
+import { SavedMatchupSchedule, GameCategory, MatchResult, RankingRule } from '../types';
 
 const STORAGE_KEY = 'flexidraw_saved_schedules';
+const RESULTS_STORAGE_KEY_PREFIX = 'flexidraw_results_';
 
 export function loadMatchupSchedules(): SavedMatchupSchedule[] {
     try {
@@ -28,3 +29,27 @@ export function updateMatchupSchedule(id: string, updates: Partial<SavedMatchupS
     );
     localStorage.setItem(STORAGE_KEY, JSON.stringify(schedules));
 }
+
+export interface ResultsState {
+    categories: GameCategory[];
+    results: Record<string, MatchResult>;
+    rules: RankingRule[];
+}
+
+export function loadResultsState(scheduleId: string): ResultsState | null {
+    try {
+        const raw = localStorage.getItem(`${RESULTS_STORAGE_KEY_PREFIX}${scheduleId}`);
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
+}
+
+export function saveResultsState(scheduleId: string, state: ResultsState): void {
+    localStorage.setItem(`${RESULTS_STORAGE_KEY_PREFIX}${scheduleId}`, JSON.stringify(state));
+}
+
+export function clearResultsState(scheduleId: string): void {
+    localStorage.removeItem(`${RESULTS_STORAGE_KEY_PREFIX}${scheduleId}`);
+}
+

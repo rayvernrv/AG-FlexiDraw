@@ -103,7 +103,7 @@ export interface SavedMatchupSchedule {
 export interface GameCategory {
   id: string;
   name: string; // e.g. "Men Singles", "Women Doubles"
-  type: 'single_set' | 'best_of_3' | 'best_of_5';
+  type: 'best_of_1' | 'best_of_3' | 'best_of_5' | 'best_of_7';
 }
 
 export interface GameResult {
@@ -112,6 +112,7 @@ export interface GameResult {
   teamBSets: number;
   teamAPoints: number;
   teamBPoints: number;
+  setScores: { teamAPoints: number; teamBPoints: number }[];
 }
 
 export interface MatchResult {
