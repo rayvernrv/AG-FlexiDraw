@@ -298,7 +298,7 @@ export const ResultsRankings: React.FC = () => {
 
                             {/* 4. Ranking Config & Tables (Right Side) */}
                             <div className="bg-white p-6 rounded-lg shadow border border-slate-200 xl:w-1/2 w-full">
-                                <div className="flex justify-between items-start mb-6 sticky top-0 bg-white z-10 py-2 border-b border-white">
+                                <div className="flex justify-between items-start mb-6 sticky top-24 bg-white z-10 py-2 border-b border-white">
                                     <h2 className="text-xl font-bold text-slate-800">4. Live Rankings</h2>
 
                                     {/* Rule Priority Configurator */}
