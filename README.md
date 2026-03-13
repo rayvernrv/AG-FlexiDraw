@@ -16,8 +16,9 @@ This draw generator consists of two parts:
 This is the starting point for both draw modes.
 *   **Manual Entry:** Enter an Organization name (e.g., "Club A") and a count (e.g., 2 teams) to batch-create teams.
 *   **Import CSV:** You can upload a `.csv` file with the headers: `Name, Organization, Seed`.
-*   **Duplicate Handling:** The system automatically detects duplicate entries and offers a "Remove Duplicates" button.
-*   **Actions:** Edit names/seeds inline or delete specific teams.
+*   **Duplicate Handling:** The system automatically detects duplicate entries (Name/Org pairs).
+*   **Seed Uniqueness:** The system ensures no two teams share the same seed. Duplicate seeds are highlighted in **red**.
+*   **Actions:** Edit names/seeds inline or use "Remove Duplicates" to bulk-clean names and seeds.
 
 ---
 
@@ -28,12 +29,13 @@ This is the starting point for both draw modes.
 *   **Auto-Distribute:** Use "Generate Groups" in the Teams tab to auto-create groups.
 *   **Capacity Check:** Total Team Count must match Total Group Capacity.
 
-#### 3. Bracket Settings (Elimination mode only)
-*   The "Brackets" tab is only available in Direct Bracket mode. In Group Mode, advancement is handled through the Matchup and Results tabs.
+#### 3. Matchups & Results
+*   Once a draw is run, matchups are generated automatically.
+*   Results are recorded in the **Results & Rankings** tab (see below).
 
 #### 4. Rules Stage
 *   **Attribute Exclusion:** Prevent teams from the same Org in the same group.
-*   **Seed Separation:** Prevent specific seeds from meeting in the same group.
+*   **Seed Group Separation:** Prevent specific seeds from meeting in the same group. Use the **selection interface** to toggle seeds (1, 2, 3...) instead of manual typing.
 *   **Team Lock:** Force a team into a specific group.
 
 ---
@@ -54,8 +56,13 @@ This is the starting point for both draw modes.
 
 ---
 
-### 🏁 Results & Export (Common)
+### 🏁 Results, Rankings & Export (Common)
 *   **Run Draw:** Triggers the randomization algorithm.
+*   **Record Results:**
+    *   Enter scores for each set in the Results & Rankings tab.
+    *   **Blank Defaults:** Score inputs are blank by default for a cleaner UI.
+    *   **Flexible Entry:** Supports single-digit `0` and clearing inputs.
+    *   **Live Rankings:** Tables update instantly using configurable tiebreaker rules (H2H, Point Diff, etc.).
 *   **Visual View:** 
     *   *Group Mode:* Shows organized group tables.
     *   *Elimination Mode:* Shows a visual tournament bracket/tree.
