@@ -27,16 +27,13 @@ This is the starting point for both draw modes.
 #### 2. Groups Tab
 *   **Auto-Distribute:** Use "Generate Groups" in the Teams tab to auto-create groups.
 *   **Capacity Check:** Total Team Count must match Total Group Capacity.
-*   **Zones:** Assign groups to "Zones" (Top/Bottom Half) for later bracket seeding rules.
 
-#### 3. Brackets Tab
-*   **Advancing Teams:** Set how many teams move on from each group (e.g., Top 2).
-*   **Zone Mapping:** Map your Groups to Bracket Zones (e.g., Group A -> Top Half).
+#### 3. Bracket Settings (Elimination mode only)
+*   The "Brackets" tab is only available in Direct Bracket mode. In Group Mode, advancement is handled through the Matchup and Results tabs.
 
 #### 4. Rules Stage
 *   **Attribute Exclusion:** Prevent teams from the same Org in the same group.
-*   **Seed Separation:** Prevent seeds 1 & 2 from meeting in the group stage.
-*   **Seed Zone Separation:** Force seeds 1 & 2 into opposite halves of the bracket.
+*   **Seed Separation:** Prevent specific seeds from meeting in the same group.
 *   **Team Lock:** Force a team into a specific group.
 
 ---
@@ -99,10 +96,9 @@ Fill in the newly created sheets:
 **Sheet: Groups**
 *   **Name:** Group Name (e.g., "Group A").
 *   **Capacity:** Number of slots (e.g., 4).
-*   **Zone:** Bracket assignment (e.g., "Top Half").
 
 **Sheet: Rules**
-*   **Type:** Valid values: `MUTUAL_EXCLUSION`, `SEED_SEPARATION`, `ZONE_SEPARATION`, `TEAM_LOCK`.
+*   **Type:** Valid values: `MUTUAL_EXCLUSION`, `SEED_SEPARATION`, `TEAM_LOCK`.
 *   **Attribute / Team Name:** 
     *   For Exclusion: "organization"
     *   For Lock: The exact Team Name.
