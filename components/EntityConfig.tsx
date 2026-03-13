@@ -62,7 +62,6 @@ export const EntityConfig: React.FC<EntityConfigProps> = ({ teams, setTeams, set
         id: Math.random().toString(36).substr(2, 9),
         name: `Group ${String.fromCharCode(65 + i)}`,
         capacity: Math.max(1, capacity), // Ensure at least 1 capacity if teams exist, else user can fix
-        zone: '', // Reset zone, user maps later
         teams: []
       });
     }
@@ -129,23 +128,34 @@ export const EntityConfig: React.FC<EntityConfigProps> = ({ teams, setTeams, set
 
   // --- Duplicate Detection ---
 
-  const duplicates = useMemo(() => {
+  const { duplicates, seedDuplicates } = useMemo(() => {
     const seen = new Set<string>();
     const dupIds = new Set<string>();
+    const seedSeen = new Map<number, string>();
+    const seedDupIds = new Set<string>();
 
     teams.forEach(t => {
+      // Name/Org duplicates
       const key = `${t.name.toLowerCase()}|${t.organization.toLowerCase()}`;
       if (seen.has(key)) {
         dupIds.add(t.id);
-        // Find the original to mark it too if needed, but for now we mark subsequent ones
-        // Actually, let's mark ALL instances of the duplicate
         teams.filter(ot => ot.name.toLowerCase() === t.name.toLowerCase() && ot.organization.toLowerCase() === t.organization.toLowerCase())
           .forEach(dt => dupIds.add(dt.id));
       } else {
         seen.add(key);
       }
+
+      // Seed duplicates
+      if (t.seed != null && t.seed > 0) {
+        if (seedSeen.has(t.seed)) {
+          seedDupIds.add(t.id);
+          seedDupIds.add(seedSeen.get(t.seed)!);
+        } else {
+          seedSeen.set(t.seed, t.id);
+        }
+      }
     });
-    return dupIds;
+    return { duplicates: dupIds, seedDuplicates: seedDupIds };
   }, [teams]);
 
   const removeAllDuplicates = () => {
@@ -264,9 +274,12 @@ export const EntityConfig: React.FC<EntityConfigProps> = ({ teams, setTeams, set
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-slate-800">Teams List ({teams.length})</h3>
           <div className="flex gap-4">
-            {duplicates.size > 0 && (
-              <button onClick={removeAllDuplicates} className="text-red-600 bg-red-50 border border-red-200 px-3 py-1 rounded text-sm font-medium hover:bg-red-100">
-                Remove Duplicates ({duplicates.size})
+            {(duplicates.size > 0 || seedDuplicates.size > 0) && (
+              <button 
+                onClick={removeAllDuplicates} 
+                className="text-red-600 bg-red-50 border border-red-200 px-3 py-1 rounded text-sm font-medium hover:bg-red-100"
+              >
+                Remove Duplicates ({duplicates.size + seedDuplicates.size})
               </button>
             )}
             <button onClick={() => setTeams([])} className="text-slate-500 text-sm hover:underline">Clear All</button>
@@ -287,8 +300,9 @@ export const EntityConfig: React.FC<EntityConfigProps> = ({ teams, setTeams, set
             <tbody className="divide-y divide-slate-100">
               {teams.map((team, idx) => {
                 const isDup = duplicates.has(team.id);
+                const isSeedDup = seedDuplicates.has(team.id);
                 return (
-                  <tr key={team.id} className={`hover:bg-slate-50 group ${isDup ? 'bg-red-50' : ''}`}>
+                  <tr key={team.id} className={`hover:bg-slate-50 group ${(isDup || isSeedDup) ? 'bg-red-50' : ''}`}>
                     <td className="p-2 text-slate-400 text-xs">{idx + 1}</td>
                     <td className="p-2">
                       <input
@@ -307,12 +321,12 @@ export const EntityConfig: React.FC<EntityConfigProps> = ({ teams, setTeams, set
                     <td className="p-2">
                       <input
                         type="number"
-                        className="bg-transparent border border-slate-200 rounded w-16 px-1 text-center"
-                        value={team.seed || ''}
+                        className={`bg-transparent border rounded w-16 px-1 text-center ${isSeedDup ? 'border-red-500 bg-red-100 text-red-800 font-bold' : 'border-slate-200'}`}
+                        value={team.seed != null ? team.seed : ''}
                         placeholder="-"
                         onChange={(e) => {
                           const v = parseInt(e.target.value);
-                          updateTeam(team.id, { seed: v > 0 ? v : null });
+                          updateTeam(team.id, { seed: !isNaN(v) && v > 0 ? v : null });
                         }}
                         onFocus={(e) => e.target.select()}
                       />

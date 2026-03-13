@@ -4,7 +4,6 @@ import { INITIAL_TEAMS, INITIAL_GROUPS, INITIAL_RULES } from './constants';
 import { EntityConfig } from './components/EntityConfig';
 import { GroupConfig } from './components/GroupConfig';
 import { RuleConfig } from './components/RuleConfig';
-import { BracketConfig } from './components/BracketConfig';
 import { EliminationConfig } from './components/EliminationConfig';
 import { EliminationBracketView } from './components/EliminationBracketView';
 import { runDraw } from './services/drawEngine';
@@ -30,17 +29,12 @@ const App = () => {
   // Draw Mode: 'group' for traditional group stage, 'elimination' for direct bracket
   const [drawMode, setDrawMode] = useState<DrawMode>('group');
 
-  const [activeTab, setActiveTab] = useState<'teams' | 'groups' | 'brackets' | 'elimination' | 'rules' | 'draw' | 'results'>('teams');
+  const [activeTab, setActiveTab] = useState<'teams' | 'groups' | 'elimination' | 'rules' | 'draw' | 'results'>('teams');
 
   // State
   const [teams, setTeams] = useState<Team[]>(INITIAL_TEAMS);
   const [groups, setGroups] = useState<Group[]>(INITIAL_GROUPS);
   const [rules, setRules] = useState<Rule[]>(INITIAL_RULES);
-  const [bracket, setBracket] = useState<BracketDefinition>({
-    name: 'Quarter-Finals',
-    zones: ['Top Half', 'Bottom Half'],
-    advancingPerGroup: 2
-  });
 
   // Elimination bracket state
   const [eliminationBracket, setEliminationBracket] = useState<EliminationBracket>(
@@ -126,11 +120,10 @@ const App = () => {
     if (drawMode === 'group') {
       if (!lastResult?.success) return;
 
-      const headers = ['Group', 'Zone/Bracket', 'Team Name', 'Organization', 'Seed'];
+      const headers = ['Group', 'Team Name', 'Organization', 'Seed'];
       const rows = lastResult.groups.flatMap(g =>
         g.teams.map(t => [
           `"${g.name}"`,
-          `"${g.zone || ''}"`,
           `"${t.name}"`,
           `"${t.organization}"`,
           t.seed || ''
@@ -190,10 +183,9 @@ const App = () => {
       return [
         { id: 'teams' as const, label: '1. Teams & Orgs', count: teams.length },
         { id: 'groups' as const, label: '2. Groups', count: groups.length },
-        { id: 'brackets' as const, label: '3. Brackets', count: bracket.zones.length },
-        { id: 'rules' as const, label: '4. Rules', count: rules.filter(r => r.isActive && r.type !== 'HALF_SEPARATION').length },
-        { id: 'draw' as const, label: '5. Draw', count: lastResult ? (lastResult.success ? '✓' : '✗') : '-' },
-        { id: 'results' as const, label: '6. Results & Rankings', count: savedSchedules.length },
+        { id: 'rules' as const, label: '3. Rules', count: rules.filter(r => r.isActive && r.type !== 'HALF_SEPARATION').length },
+        { id: 'draw' as const, label: '4. Draw', count: lastResult ? (lastResult.success ? '✓' : '✗') : '-' },
+        { id: 'results' as const, label: '5. Results & Rankings', count: savedSchedules.length },
       ];
     } else {
       return [
@@ -318,19 +310,7 @@ const App = () => {
             {activeTab === 'groups' && drawMode === 'group' && (
               <div>
                 <h2 className="text-2xl font-bold text-slate-800 mb-6">Group Configuration</h2>
-                <GroupConfig groups={groups} setGroups={setGroups} totalTeams={teams.length} bracket={bracket} />
-              </div>
-            )}
-
-            {activeTab === 'brackets' && drawMode === 'group' && (
-              <div>
-                <h2 className="text-2xl font-bold text-slate-800 mb-6">Bracket Definition</h2>
-                <BracketConfig
-                  bracket={bracket}
-                  setBracket={setBracket}
-                  groups={groups}
-                  setGroups={setGroups}
-                />
+                <GroupConfig groups={groups} setGroups={setGroups} totalTeams={teams.length} />
               </div>
             )}
 
@@ -414,7 +394,6 @@ const App = () => {
                               <div className="bg-slate-100 p-3 border-b border-slate-200 flex justify-between items-center">
                                 <div>
                                   <span className="font-bold text-slate-700">{g.name}</span>
-                                  {g.zone && <span className="text-xs text-slate-500 ml-2">({g.zone})</span>}
                                 </div>
                                 <span className="text-xs text-slate-500 bg-white px-2 py-0.5 rounded border">{g.teams.length}/{g.capacity}</span>
                               </div>

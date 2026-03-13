@@ -268,11 +268,11 @@ export const ResultsRankings: React.FC = () => {
                                                                                         <div key={setIdx} className="flex justify-center items-center gap-4">
                                                                                             <div className="text-xs font-bold text-slate-400 w-12 text-right">Set {setIdx + 1}</div>
                                                                                             <input type="number" min="0" className="w-16 p-1 border rounded text-center font-mono"
-                                                                                                value={setScore.teamAPoints || ''}
+                                                                                                value={setScore.teamAPoints !== undefined && setScore.teamAPoints !== null ? setScore.teamAPoints : ''}
                                                                                                 onChange={e => handleSetScoreChange(match.id, cat.id, setIdx, 'teamAPoints', e.target.value === '' ? 0 : parseInt(e.target.value, 10))} />
                                                                                             <div className="text-slate-300 font-bold">-</div>
                                                                                             <input type="number" min="0" className="w-16 p-1 border rounded text-center font-mono"
-                                                                                                value={setScore.teamBPoints || ''}
+                                                                                                value={setScore.teamBPoints !== undefined && setScore.teamBPoints !== null ? setScore.teamBPoints : ''}
                                                                                                 onChange={e => handleSetScoreChange(match.id, cat.id, setIdx, 'teamBPoints', e.target.value === '' ? 0 : parseInt(e.target.value, 10))} />
                                                                                         </div>
                                                                                     );
