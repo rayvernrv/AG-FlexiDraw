@@ -90,7 +90,7 @@ export const ResultsRankings: React.FC = () => {
     };
 
     // --- Results Management ---
-    const handleSetScoreChange = (matchId: string, catId: string, setIndex: number, field: 'teamAPoints' | 'teamBPoints', value: number) => {
+    const handleSetScoreChange = (matchId: string, catId: string, setIndex: number, field: 'teamAPoints' | 'teamBPoints', value: number | null) => {
         setResults(prev => {
             const matchResult = prev[matchId] || {
                 matchupId: matchId,
@@ -100,7 +100,7 @@ export const ResultsRankings: React.FC = () => {
                     teamBSets: 0,
                     teamAPoints: 0,
                     teamBPoints: 0,
-                    setScores: Array.from({ length: getMaxSets(c.type) }, () => ({ teamAPoints: 0, teamBPoints: 0 }))
+                    setScores: Array.from({ length: getMaxSets(c.type) }, () => ({ teamAPoints: null, teamBPoints: null }))
                 })),
                 isComplete: false,
                 teamAMatchWins: 0,
@@ -114,7 +114,7 @@ export const ResultsRankings: React.FC = () => {
                 const maxSets = cat ? getMaxSets(cat.type) : 3;
                 let currentSetScores = g.setScores ? [...g.setScores] : [];
                 while (currentSetScores.length < maxSets) {
-                    currentSetScores.push({ teamAPoints: 0, teamBPoints: 0 });
+                    currentSetScores.push({ teamAPoints: null, teamBPoints: null });
                 }
 
                 currentSetScores[setIndex] = { ...currentSetScores[setIndex], [field]: value };
@@ -254,26 +254,26 @@ export const ResultsRankings: React.FC = () => {
                                                                 {categories.map(cat => {
                                                                     const maxSets = getMaxSets(cat.type);
                                                                     const gameRes = results[match.id]?.games.find(g => g.categoryId === cat.id) ||
-                                                                        { teamASets: 0, teamBSets: 0, teamAPoints: 0, teamBPoints: 0, setScores: Array.from({ length: maxSets }, () => ({ teamAPoints: 0, teamBPoints: 0 })) };
+                                                                        { teamASets: 0, teamBSets: 0, teamAPoints: 0, teamBPoints: 0, setScores: Array.from({ length: maxSets }, () => ({ teamAPoints: null, teamBPoints: null })) };
 
-                                                                    const setScores = gameRes.setScores || Array.from({ length: maxSets }, () => ({ teamAPoints: 0, teamBPoints: 0 }));
+                                                                    const setScores = gameRes.setScores || Array.from({ length: maxSets }, () => ({ teamAPoints: null, teamBPoints: null }));
 
                                                                     return (
                                                                         <div key={cat.id} className="bg-slate-50 p-3 rounded border border-slate-100">
                                                                             <div className="text-center font-bold text-sm text-slate-700 mb-3">{cat.name} <span className="text-xs font-normal text-slate-500">({cat.type.replace(/_/g, ' ').toUpperCase()})</span></div>
                                                                             <div className="flex flex-col gap-2">
                                                                                 {Array.from({ length: maxSets }).map((_, setIdx) => {
-                                                                                    const setScore = setScores[setIdx] || { teamAPoints: 0, teamBPoints: 0 };
+                                                                                    const setScore = setScores[setIdx] || { teamAPoints: null, teamBPoints: null };
                                                                                     return (
                                                                                         <div key={setIdx} className="flex justify-center items-center gap-4">
                                                                                             <div className="text-xs font-bold text-slate-400 w-12 text-right">Set {setIdx + 1}</div>
                                                                                             <input type="number" min="0" className="w-16 p-1 border rounded text-center font-mono"
                                                                                                 value={setScore.teamAPoints !== undefined && setScore.teamAPoints !== null ? setScore.teamAPoints : ''}
-                                                                                                onChange={e => handleSetScoreChange(match.id, cat.id, setIdx, 'teamAPoints', e.target.value === '' ? 0 : parseInt(e.target.value, 10))} />
+                                                                                                onChange={e => handleSetScoreChange(match.id, cat.id, setIdx, 'teamAPoints', e.target.value === '' ? null : parseInt(e.target.value, 10))} />
                                                                                             <div className="text-slate-300 font-bold">-</div>
                                                                                             <input type="number" min="0" className="w-16 p-1 border rounded text-center font-mono"
                                                                                                 value={setScore.teamBPoints !== undefined && setScore.teamBPoints !== null ? setScore.teamBPoints : ''}
-                                                                                                onChange={e => handleSetScoreChange(match.id, cat.id, setIdx, 'teamBPoints', e.target.value === '' ? 0 : parseInt(e.target.value, 10))} />
+                                                                                                onChange={e => handleSetScoreChange(match.id, cat.id, setIdx, 'teamBPoints', e.target.value === '' ? null : parseInt(e.target.value, 10))} />
                                                                                         </div>
                                                                                     );
                                                                                 })}

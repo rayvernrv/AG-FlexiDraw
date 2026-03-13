@@ -110,7 +110,7 @@ export interface GameResult {
   teamBSets: number;
   teamAPoints: number;
   teamBPoints: number;
-  setScores: { teamAPoints: number; teamBPoints: number }[];
+  setScores: { teamAPoints: number | null; teamBPoints: number | null }[];
 }
 
 export interface MatchResult {
