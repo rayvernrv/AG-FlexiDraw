@@ -10,14 +10,12 @@ export interface Group {
   id: string;
   name: string;
   capacity: number;
-  zone?: string; // e.g. "Top Half", "Bottom Half", "Bracket A"
   teams: Team[];
 }
 
 export enum RuleType {
   MUTUAL_EXCLUSION = 'MUTUAL_EXCLUSION', // e.g., No two teams from Org A in same group
   SEED_SEPARATION = 'SEED_SEPARATION',   // e.g., Seed 1 and 2 cannot meet in same group
-  ZONE_SEPARATION = 'ZONE_SEPARATION',   // e.g., Seed 1 and 2 cannot meet in same Zone (Bracket Half)
   MAX_PER_GROUP = 'MAX_PER_GROUP',       // e.g., Max 1 team from Org A
   TEAM_LOCK = 'TEAM_LOCK',               // e.g., Team A MUST be in Group B
   HALF_SEPARATION = 'HALF_SEPARATION',   // e.g., Teams cannot meet until final (for elimination brackets)
@@ -112,7 +110,7 @@ export interface GameResult {
   teamBSets: number;
   teamAPoints: number;
   teamBPoints: number;
-  setScores: { teamAPoints: number; teamBPoints: number }[];
+  setScores: { teamAPoints: number | null; teamBPoints: number | null }[];
 }
 
 export interface MatchResult {

@@ -69,30 +69,6 @@ const checkConstraints = (
         break;
       }
 
-      case RuleType.ZONE_SEPARATION: {
-        const seedsToSeparate = rule.params.seeds || [];
-        // Only applies if the current group has a zone defined
-        if (group.zone && team.seed && seedsToSeparate.includes(team.seed)) {
-          // Check all OTHER groups with the SAME zone to see if they contain a restricted seed
-          for (const g of groupsState) {
-            if (g.zone === group.zone) {
-              // Iterate teams in that group (could be the current group or another one in the zone)
-              const hasConflict = g.teams.some(
-                (t) => t.seed && seedsToSeparate.includes(t.seed)
-              );
-
-              if (hasConflict) {
-                return {
-                  valid: false,
-                  reason: `Rule Violation: Zone Separation. Zone '${group.zone}' already contains a restricted seed.`
-                };
-              }
-            }
-          }
-        }
-        break;
-      }
-
       case RuleType.MAX_PER_GROUP: {
         const attr = rule.params.attribute as keyof Team;
         const max = rule.params.maxCount || 1;

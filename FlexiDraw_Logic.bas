@@ -9,9 +9,9 @@
 '
 ' SHEET FORMATS:
 ' Sheet "Teams":  Col A: Name, Col B: Organization, Col C: Seed (Number)
-' Sheet "Groups": Col A: Name, Col B: Capacity, Col C: Zone
+' Sheet "Groups": Col A: Name, Col B: Capacity
 ' Sheet "Rules":  
-'    Col A: Type (MUTUAL_EXCLUSION, SEED_SEPARATION, ZONE_SEPARATION, TEAM_LOCK)
+'    Col A: Type (MUTUAL_EXCLUSION, SEED_SEPARATION, TEAM_LOCK)
 '    Col B: Attribute / Team Name (for LOCK)
 '    Col C: Seeds / Group Name (for LOCK)
 '    Col D: MaxCount
@@ -33,7 +33,6 @@ Type Group
     ID As String
     Name As String
     Capacity As Integer
-    Zone As String
     TeamCount As Integer
     TeamIndices(1 To 100) As Integer 
 End Type
@@ -121,7 +120,6 @@ Sub LoadDataFromSheets()
         AllGroups(i - 1).ID = "G" & i
         AllGroups(i - 1).Name = ws.Cells(i, 1).Value
         AllGroups(i - 1).Capacity = CInt(ws.Cells(i, 2).Value)
-        AllGroups(i - 1).Zone = ws.Cells(i, 3).Value
         AllGroups(i - 1).TeamCount = 0
     Next i
     
@@ -213,21 +211,6 @@ Function CheckConstraints(teamIdx As Integer, groupIdx As Integer) As Boolean
                             End If
                         Next t
                     End If
-                Case "ZONE_SEPARATION"
-                    If currentTeam.Seed > 0 And targetGroup.Zone <> "" And InStr(AllRules(r).Seeds, "," & currentTeam.Seed & ",") > 0 Then
-                        For g = 1 To GroupCount
-                            If AllGroups(g).Zone = targetGroup.Zone Then
-                                For t = 1 To AllGroups(g).TeamCount
-                                    Dim zSeed As Integer
-                                    zSeed = AllTeams(AllGroups(g).TeamIndices(t)).Seed
-                                    If zSeed > 0 And InStr(AllRules(r).Seeds, "," & zSeed & ",") > 0 Then
-                                        CheckConstraints = False
-                                        Exit Function
-                                    End If
-                                Next t
-                            End If
-                        Next g
-                    End If
             End Select
         End If
     Next r
@@ -266,17 +249,6 @@ Sub OutputToSheet()
         
         ' Merge header across 3 columns
         ws.Range(ws.Cells(currentGroupRow, currentGroupCol), ws.Cells(currentGroupRow, currentGroupCol + 2)).Merge
-        
-        ' Zone info below name
-        If AllGroups(g).Zone <> "" Then
-             With ws.Cells(currentGroupRow + 1, currentGroupCol)
-                .Value = "(" & AllGroups(g).Zone & ")"
-                .Font.Size = 8
-                .Font.Italic = True
-                .HorizontalAlignment = xlCenter
-             End With
-             ws.Range(ws.Cells(currentGroupRow + 1, currentGroupCol), ws.Cells(currentGroupRow + 1, currentGroupCol + 2)).Merge
-        End If
         
         ' Headers for the team table
         ws.Cells(currentGroupRow + 2, currentGroupCol).Value = "Team"

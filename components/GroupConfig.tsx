@@ -1,14 +1,13 @@
 import React from 'react';
-import { Group, BracketDefinition } from '../types';
+import { Group } from '../types';
 
 interface GroupConfigProps {
   groups: Group[];
   setGroups: (groups: Group[]) => void;
   totalTeams: number;
-  bracket: BracketDefinition;
 }
 
-export const GroupConfig: React.FC<GroupConfigProps> = ({ groups, setGroups, totalTeams, bracket }) => {
+export const GroupConfig: React.FC<GroupConfigProps> = ({ groups, setGroups, totalTeams }) => {
 
   const totalCapacity = groups.reduce((sum, g) => sum + g.capacity, 0);
   const isCapacityMatch = totalCapacity === totalTeams;
@@ -18,7 +17,6 @@ export const GroupConfig: React.FC<GroupConfigProps> = ({ groups, setGroups, tot
       id: Math.random().toString(36).substr(2, 9),
       name: `Group ${String.fromCharCode(65 + groups.length)}`, // A, B, C...
       capacity: 4,
-      zone: bracket.zones[0] || '',
       teams: []
     };
     setGroups([...groups, newGroup]);
@@ -105,20 +103,6 @@ export const GroupConfig: React.FC<GroupConfigProps> = ({ groups, setGroups, tot
                 />
               </div>
 
-              <div className="mb-2">
-                <label className="block text-xs text-slate-500 mb-1">Zone / Bracket</label>
-                <select
-                  className="w-full p-1 border border-slate-300 rounded text-sm bg-slate-50"
-                  value={group.zone || ''}
-                  onChange={(e) => updateGroup(group.id, { zone: e.target.value })}
-                >
-                  <option value="">-- No Zone --</option>
-                  {bracket.zones.map((z, idx) => (
-                    <option key={idx} value={z}>{z}</option>
-                  ))}
-                </select>
-              </div>
-
               <div>
                 <label className="block text-xs text-slate-500 mb-1">Capacity</label>
                 <input
@@ -133,7 +117,6 @@ export const GroupConfig: React.FC<GroupConfigProps> = ({ groups, setGroups, tot
           ))}
         </div>
 
-        <p className="text-xs text-slate-400 mt-4 text-right">Configure available zones in the <strong>Brackets</strong> tab.</p>
       </div>
     </div>
   );

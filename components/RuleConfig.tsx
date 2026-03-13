@@ -15,6 +15,8 @@ export const RuleConfig: React.FC<RuleConfigProps> = ({ rules, setRules, teams, 
     setRules(rules.map(r => r.id === id ? { ...r, isActive: !r.isActive } : r));
   };
 
+  const availableSeeds: number[] = Array.from(new Set<number>(teams.map(t => t.seed).filter((s): s is number => s != null && s > 0))).sort((a: number, b: number) => a - b);
+
   const addRule = (type: RuleType) => {
     let name = 'New Rule';
     let params: Rule['params'] = {};
@@ -26,11 +28,7 @@ export const RuleConfig: React.FC<RuleConfigProps> = ({ rules, setRules, teams, 
         break;
       case RuleType.SEED_SEPARATION:
         name = 'New Seed Group Separation';
-        params = { seeds: [1, 2] };
-        break;
-      case RuleType.ZONE_SEPARATION:
-        name = 'New Seed Bracket/Zone Separation';
-        params = { seeds: [1, 2] };
+        params = { seeds: availableSeeds.slice(0, 2) };
         break;
       case RuleType.TEAM_LOCK:
         name = 'New Team Assignment';
@@ -111,12 +109,6 @@ export const RuleConfig: React.FC<RuleConfigProps> = ({ rules, setRules, teams, 
               + Seed Group Separation
             </button>
             <button
-              onClick={() => addRule(RuleType.ZONE_SEPARATION)}
-              className="bg-white border border-purple-200 text-purple-700 px-4 py-2 rounded shadow-sm hover:bg-purple-50 text-sm"
-            >
-              + Seed Bracket Separation
-            </button>
-            <button
               onClick={() => addRule(RuleType.TEAM_LOCK)}
               className="bg-white border border-yellow-300 text-yellow-800 px-4 py-2 rounded shadow-sm hover:bg-yellow-50 text-sm font-medium"
             >
@@ -174,34 +166,35 @@ export const RuleConfig: React.FC<RuleConfigProps> = ({ rules, setRules, teams, 
                 )}
 
                 {rule.type === RuleType.SEED_SEPARATION && (
-                  <div className="flex items-center gap-2">
-                    <span>Keep seeds</span>
-                    <input
-                      type="text"
-                      className="border border-slate-300 rounded px-2 py-1 w-24 text-center bg-white"
-                      value={rule.params.seeds?.join(', ') || ''}
-                      onChange={(e) => {
-                        const seeds = e.target.value.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
-                        setRules(rules.map(r => r.id === rule.id ? { ...r, params: { ...r.params, seeds } } : r));
-                      }}
-                    />
-                    <span>apart in <strong>Groups</strong>.</span>
-                  </div>
-                )}
-
-                {rule.type === RuleType.ZONE_SEPARATION && (
-                  <div className="flex items-center gap-2">
-                    <span>Keep seeds</span>
-                    <input
-                      type="text"
-                      className="border border-slate-300 rounded px-2 py-1 w-24 text-center bg-white"
-                      value={rule.params.seeds?.join(', ') || ''}
-                      onChange={(e) => {
-                        const seeds = e.target.value.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
-                        setRules(rules.map(r => r.id === rule.id ? { ...r, params: { ...r.params, seeds } } : r));
-                      }}
-                    />
-                    <span>apart in <strong>Zones</strong>.</span>
+                  <div className="mt-2 text-slate-600">
+                    <p className="mb-2">Keep these seeds apart in <strong>Groups</strong>:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {availableSeeds.map(seed => {
+                        const isSelected = rule.params.seeds?.includes(seed);
+                        return (
+                          <button
+                            key={seed}
+                            onClick={() => {
+                              const currentSeeds = rule.params.seeds || [];
+                              const newSeeds = isSelected 
+                                ? currentSeeds.filter(s => s !== seed)
+                                : [...currentSeeds, seed];
+                              setRules(rules.map(r => r.id === rule.id ? { ...r, params: { ...r.params, seeds: newSeeds } } : r));
+                            }}
+                            className={`px-3 py-1.5 rounded-full text-sm border transition ${isSelected
+                                ? 'bg-brand-100 border-brand-400 text-brand-800 font-medium'
+                                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                              }`}
+                          >
+                            {isSelected && <span className="mr-1">✓</span>}
+                            Seed {seed}
+                          </button>
+                        );
+                      })}
+                      {availableSeeds.length === 0 && (
+                        <p className="text-xs text-amber-600">⚠ No seeds assigned to teams yet.</p>
+                      )}
+                    </div>
                   </div>
                 )}
 
