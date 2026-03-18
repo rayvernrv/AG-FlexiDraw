@@ -57,7 +57,10 @@ const App = () => {
 
   const totalCapacity = groups.reduce((sum, g) => sum + g.capacity, 0);
   const isGroupSetupValid = totalCapacity === teams.length;
-  const isEliminationSetupValid = teams.length === eliminationBracket.totalSlots;
+
+  // Elimination validation: at least 2 teams filled in brackets
+  const eliminationFilledSlots = eliminationBracket.slots.filter(s => s.team).length;
+  const isEliminationSetupValid = eliminationFilledSlots >= 2;
 
   const isSetupValid = drawMode === 'group' ? isGroupSetupValid : isEliminationSetupValid;
 
@@ -77,7 +80,7 @@ const App = () => {
 
   const handleDrawModeChange = (mode: DrawMode) => {
     setDrawMode(mode);
-    setActiveTab('teams');
+    setActiveTab(mode === 'group' ? 'teams' : 'elimination');
     setLastResult(null);
     setLastEliminationResult(null);
     // Reset matchup state
@@ -90,7 +93,7 @@ const App = () => {
     if (!isSetupValid) {
       alert(drawMode === 'group'
         ? "Cannot run draw: Group capacity does not match team count."
-        : `Cannot run draw: Need ${eliminationBracket.totalSlots} teams (have ${teams.length})`);
+        : 'Need at least 2 teams in the bracket to run draw.');
       return;
     }
     setIsDrawing(true);
@@ -108,12 +111,76 @@ const App = () => {
         setGeneratedMatchups([]);
         setShowRoundRobinPrompt(false);
       } else {
-        const result = runEliminationDraw(teams, eliminationBracket, rules);
-        setLastEliminationResult(result);
-        setLastResult(null);
+        // Elimination mode: extract teams from filled slots and run draw
+        handleFinalizeElimination('randomize');
       }
       setIsDrawing(false);
     }, 100);
+  };
+
+  // Handle elimination bracket finalization from EliminationConfig
+  const handleFinalizeElimination = (mode: 'randomize' | 'use_as_is') => {
+    const logs: string[] = [];
+    const workingSlots: BracketSlot[] = eliminationBracket.slots.map(s => ({ ...s }));
+
+    if (mode === 'use_as_is') {
+      // Use the bracket exactly as configured
+      logs.push(`Using bracket as-is with ${workingSlots.filter(s => s.team).length} teams`);
+      const emptyCount = workingSlots.filter(s => !s.team).length;
+      if (emptyCount > 0) {
+        logs.push(`⚠ ${emptyCount} slot(s) are empty (BYE)`);
+      }
+
+      setLastEliminationResult({
+        success: true,
+        bracket: { ...eliminationBracket, slots: workingSlots },
+        logs
+      });
+    } else {
+      // Randomize: shuffle unlocked teams
+      const lockedSlots = workingSlots.filter(s => s.isFixed && s.team);
+      const unlockedFilledSlots = workingSlots.filter(s => !s.isFixed && s.team);
+      const emptySlots = workingSlots.filter(s => !s.isFixed && !s.team);
+
+      // Collect all unlocked teams
+      const unlockedTeams = unlockedFilledSlots.map(s => s.team!);
+
+      // Shuffle
+      for (let i = unlockedTeams.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [unlockedTeams[i], unlockedTeams[j]] = [unlockedTeams[j], unlockedTeams[i]];
+      }
+
+      // Reassign shuffled teams to unlocked+filled positions
+      let teamIdx = 0;
+      const finalSlots = workingSlots.map(s => {
+        if (s.isFixed && s.team) return s; // locked — keep
+        if (s.team) {
+          // Was filled but unlocked — assign shuffled team
+          return { ...s, team: unlockedTeams[teamIdx++] };
+        }
+        return s; // empty — keep empty
+      });
+
+      logs.push(`Randomized ${unlockedTeams.length} unlocked team(s)`);
+      if (lockedSlots.length > 0) {
+        logs.push(`🔒 ${lockedSlots.length} team(s) kept in locked positions`);
+      }
+      const stillEmpty = finalSlots.filter(s => !s.team).length;
+      if (stillEmpty > 0) {
+        logs.push(`⚠ ${stillEmpty} slot(s) are empty (BYE)`);
+      }
+      logs.push(`Successfully drew into ${eliminationBracket.roundName}`);
+
+      setLastEliminationResult({
+        success: true,
+        bracket: { ...eliminationBracket, slots: finalSlots },
+        logs
+      });
+    }
+
+    setLastResult(null);
+    setActiveTab('draw');
   };
 
   const downloadCSV = () => {
@@ -189,10 +256,8 @@ const App = () => {
       ];
     } else {
       return [
-        { id: 'teams' as const, label: '1. Teams', count: teams.length },
-        { id: 'elimination' as const, label: '2. Bracket Setup', count: eliminationBracket.totalSlots },
-        { id: 'rules' as const, label: '3. Rules', count: rules.filter(r => r.isActive && r.type === 'HALF_SEPARATION').length },
-        { id: 'draw' as const, label: 'Results', count: lastEliminationResult ? (lastEliminationResult.success ? '✓' : '✗') : '-' },
+        { id: 'elimination' as const, label: '1. Bracket Setup', count: `${eliminationFilledSlots}/${eliminationBracket.totalSlots}` },
+        { id: 'draw' as const, label: '2. Results', count: lastEliminationResult ? (lastEliminationResult.success ? '✓' : '✗') : '-' },
       ];
     }
   };
@@ -208,23 +273,31 @@ const App = () => {
             <div className="w-8 h-8 bg-brand-500 rounded flex items-center justify-center font-bold text-lg">F</div>
             <h1 className="text-xl font-bold tracking-tight">FlexiDraw <span className="text-slate-400 font-normal text-sm ml-2">Tournament System</span></h1>
           </div>
-          <button
-            onClick={() => {
-              if (!isSetupValid) {
-                alert(drawMode === 'group'
-                  ? "Adjust group capacity to match team count first!"
-                  : `Need ${eliminationBracket.totalSlots} teams for this bracket (have ${teams.length})`);
-                setActiveTab(drawMode === 'group' ? 'groups' : 'elimination');
-                return;
-              }
-              setActiveTab('draw');
-              handleDraw();
-            }}
-            className={`${isSetupValid ? 'bg-brand-600 hover:bg-brand-500' : 'bg-slate-600 cursor-not-allowed'} text-white px-6 py-2 rounded-full font-semibold shadow-md transition transform active:scale-95 flex items-center gap-2`}
-          >
-            <span>Run Draw</span>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-          </button>
+          {drawMode === 'group' ? (
+            <button
+              onClick={() => {
+                if (!isGroupSetupValid) {
+                  alert("Adjust group capacity to match team count first!");
+                  setActiveTab('groups');
+                  return;
+                }
+                setActiveTab('draw');
+                handleDraw();
+              }}
+              className={`${isGroupSetupValid ? 'bg-brand-600 hover:bg-brand-500' : 'bg-slate-600 cursor-not-allowed'} text-white px-6 py-2 rounded-full font-semibold shadow-md transition transform active:scale-95 flex items-center gap-2`}
+            >
+              <span>Run Draw</span>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+            </button>
+          ) : (
+            <button
+              onClick={() => setActiveTab('elimination')}
+              className="bg-orange-600 hover:bg-orange-500 text-white px-6 py-2 rounded-full font-semibold shadow-md transition transform active:scale-95 flex items-center gap-2"
+            >
+              <span>Bracket Setup</span>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+            </button>
+          )}
         </div>
       </header>
 
@@ -278,21 +351,24 @@ const App = () => {
           <div className={`mt-8 p-4 rounded-lg border text-xs ${drawMode === 'elimination' ? 'bg-orange-50 border-orange-100 text-orange-800' : 'bg-blue-50 border-blue-100 text-blue-800'
             }`}>
             <p className="font-bold mb-1">Current Setup:</p>
-            <p>{teams.length} Teams</p>
             {drawMode === 'group' ? (
-              <p className={`font-semibold ${!isGroupSetupValid ? 'text-red-600' : ''}`}>
-                {groups.length} Groups ({totalCapacity} slots)
-              </p>
+              <>
+                <p>{teams.length} Teams</p>
+                <p className={`font-semibold ${!isGroupSetupValid ? 'text-red-600' : ''}`}>
+                  {groups.length} Groups ({totalCapacity} slots)
+                </p>
+                <p className="mt-2 italic text-blue-600">Modify config in tabs, then click Run Draw.</p>
+              </>
             ) : (
-              <p className={`font-semibold ${!isEliminationSetupValid ? 'text-red-600' : ''}`}>
-                {eliminationBracket.roundName} ({eliminationBracket.totalSlots} slots)
-              </p>
+              <>
+                <p className="font-semibold">{eliminationBracket.roundName}</p>
+                <p>{eliminationFilledSlots}/{eliminationBracket.totalSlots} slots filled</p>
+                {eliminationBracket.slots.filter(s => s.isFixed).length > 0 && (
+                  <p>🔒 {eliminationBracket.slots.filter(s => s.isFixed).length} locked</p>
+                )}
+                <p className="mt-2 italic text-orange-600">Set up bracket, then finalize.</p>
+              </>
             )}
-            <p className={`mt-2 italic ${drawMode === 'elimination' ? 'text-orange-600' : 'text-blue-600'}`}>
-              {drawMode === 'group'
-                ? 'Modify config in tabs, then click Run Draw.'
-                : 'Set up bracket, then click Run Draw.'}
-            </p>
           </div>
         </nav>
 
@@ -300,7 +376,7 @@ const App = () => {
         <div className="md:col-span-9 lg:col-span-10">
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 min-h-[500px] p-6">
 
-            {activeTab === 'teams' && (
+            {activeTab === 'teams' && drawMode === 'group' && (
               <div>
                 <h2 className="text-2xl font-bold text-slate-800 mb-6">Team Configuration</h2>
                 <EntityConfig teams={teams} setTeams={setTeams} setGroups={setGroups} drawMode={drawMode} />
@@ -318,14 +394,14 @@ const App = () => {
               <div>
                 <h2 className="text-2xl font-bold text-slate-800 mb-6">Elimination Bracket Setup</h2>
                 <EliminationConfig
-                  teams={teams}
                   eliminationBracket={eliminationBracket}
                   setEliminationBracket={setEliminationBracket}
+                  onFinalizeDrawMode={handleFinalizeElimination}
                 />
               </div>
             )}
 
-            {activeTab === 'rules' && (
+            {activeTab === 'rules' && drawMode === 'group' && (
               <div>
                 <h2 className="text-2xl font-bold text-slate-800 mb-6">Rule Engine</h2>
                 <RuleConfig
@@ -355,7 +431,11 @@ const App = () => {
                         Export CSV
                       </button>
                     )}
-                    <button onClick={handleDraw} disabled={isDrawing} className="text-brand-600 hover:underline text-sm ml-2">
+                    <button
+                      onClick={() => drawMode === 'group' ? handleDraw() : handleFinalizeElimination('randomize')}
+                      disabled={isDrawing}
+                      className="text-brand-600 hover:underline text-sm ml-2"
+                    >
                       Re-roll
                     </button>
                   </div>
