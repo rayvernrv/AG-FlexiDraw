@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Team, Group, Rule, DrawResult, BracketDefinition, DrawMode, EliminationBracket, EliminationDrawResult, BracketSlot, Matchup, SavedMatchupSchedule } from './types';
+import { Team, Group, Rule, DrawResult, BracketDefinition, DrawMode, EliminationBracket, EliminationDrawResult, BracketSlot, Matchup, SavedMatchupSchedule, SavedEliminationSchedule, EliminationMatchup } from './types';
 import { INITIAL_TEAMS, INITIAL_GROUPS, INITIAL_RULES } from './constants';
 import { EntityConfig } from './components/EntityConfig';
 import { GroupConfig } from './components/GroupConfig';
@@ -10,8 +10,9 @@ import { runDraw } from './services/drawEngine';
 import { runEliminationDraw } from './services/bracketDrawEngine';
 import { generateVBACode } from './services/vbaGenerator';
 import { generateMatchups } from './services/matchupEngine';
-import { saveMatchupSchedule, loadMatchupSchedules, deleteMatchupSchedule, updateMatchupSchedule } from './services/storageService';
+import { saveMatchupSchedule, loadMatchupSchedules, deleteMatchupSchedule, updateMatchupSchedule, loadEliminationSchedules, saveEliminationSchedule, clearResultsState } from './services/storageService';
 import { ResultsRankings } from './components/ResultsRankings';
+import { EliminationMatchManager } from './components/EliminationMatchManager';
 
 // Helper to generate initial elimination bracket
 const generateInitialEliminationBracket = (slotCount: number, roundName: string): EliminationBracket => ({
@@ -29,7 +30,7 @@ const App = () => {
   // Draw Mode: 'group' for traditional group stage, 'elimination' for direct bracket
   const [drawMode, setDrawMode] = useState<DrawMode>('group');
 
-  const [activeTab, setActiveTab] = useState<'teams' | 'groups' | 'elimination' | 'rules' | 'draw' | 'results'>('teams');
+  const [activeTab, setActiveTab] = useState<'teams' | 'groups' | 'elimination' | 'rules' | 'draw' | 'results' | 'eliminationResults'>('teams');
 
   // State
   const [teams, setTeams] = useState<Team[]>(INITIAL_TEAMS);
@@ -37,9 +38,17 @@ const App = () => {
   const [rules, setRules] = useState<Rule[]>(INITIAL_RULES);
 
   // Elimination bracket state
-  const [eliminationBracket, setEliminationBracket] = useState<EliminationBracket>(
-    generateInitialEliminationBracket(16, 'Round of 16')
-  );
+  const [eliminationBracket, setEliminationBracket] = useState<EliminationBracket>(() => {
+    const saved = localStorage.getItem('AG_FLEXIDRAW_ELIMINATION_SETUP');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return generateInitialEliminationBracket(16, 'Round of 16');
+  });
+
+  useEffect(() => {
+    localStorage.setItem('AG_FLEXIDRAW_ELIMINATION_SETUP', JSON.stringify(eliminationBracket));
+  }, [eliminationBracket]);
 
   const [lastResult, setLastResult] = useState<DrawResult | null>(null);
   const [lastEliminationResult, setLastEliminationResult] = useState<EliminationDrawResult | null>(null);
@@ -53,7 +62,12 @@ const App = () => {
   const [savedSchedules, setSavedSchedules] = useState<SavedMatchupSchedule[]>([]);
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
   const [editingScheduleName, setEditingScheduleName] = useState('');
+  const [deletingScheduleId, setDeletingScheduleId] = useState<string | null>(null);
   const [saveName, setSaveName] = useState('');
+  
+  // Elimination schedules
+  const [savedEliminationSchedules, setSavedEliminationSchedules] = useState<SavedEliminationSchedule[]>([]);
+  const [eliminationSaveName, setEliminationSaveName] = useState('');
 
   const totalCapacity = groups.reduce((sum, g) => sum + g.capacity, 0);
   const isGroupSetupValid = totalCapacity === teams.length;
@@ -64,10 +78,11 @@ const App = () => {
 
   const isSetupValid = drawMode === 'group' ? isGroupSetupValid : isEliminationSetupValid;
 
-  // Load saved schedules from localStorage on mount
+  // Load saved schedules from localStorage on mount and when tabs change (in case inner components deleted them)
   useEffect(() => {
     setSavedSchedules(loadMatchupSchedules());
-  }, []);
+    setSavedEliminationSchedules(loadEliminationSchedules());
+  }, [activeTab]);
 
   const handleTabChange = (tabId: typeof activeTab) => {
     // For group mode, block transition from Groups if capacity is wrong
@@ -180,6 +195,8 @@ const App = () => {
     }
 
     setLastResult(null);
+    setDrawConfirmed(false);
+    setEliminationSaveName('');
     setActiveTab('draw');
   };
 
@@ -257,7 +274,8 @@ const App = () => {
     } else {
       return [
         { id: 'elimination' as const, label: '1. Bracket Setup', count: `${eliminationFilledSlots}/${eliminationBracket.totalSlots}` },
-        { id: 'draw' as const, label: '2. Results', count: lastEliminationResult ? (lastEliminationResult.success ? '✓' : '✗') : '-' },
+        { id: 'draw' as const, label: '2. Drawn Bracket', count: lastEliminationResult ? (lastEliminationResult.success ? '✓' : '✗') : '-' },
+        { id: 'eliminationResults' as const, label: '3. Tournament Progress', count: savedEliminationSchedules.length },
       ];
     }
   };
@@ -676,43 +694,56 @@ const App = () => {
                                       </p>
                                     </div>
                                     <div className="flex gap-2">
-                                      <button
-                                        onClick={() => {
-                                          setGeneratedMatchups(s.matchups);
-                                          setRoundRobinCount(s.roundRobinCount);
-                                          setDrawConfirmed(true);
-                                          setShowRoundRobinPrompt(false);
-                                          setLastResult({
-                                            success: true,
-                                            groups: s.groups,
-                                            logs: [`Loaded schedule: ${s.name}`],
-                                            executionTimeMs: 0,
-                                          });
-                                        }}
-                                        className="text-blue-600 text-xs font-medium hover:underline"
-                                      >
-                                        Load
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          setEditingScheduleId(s.id);
-                                          setEditingScheduleName(s.name);
-                                        }}
-                                        className="text-slate-500 text-xs font-medium hover:underline"
-                                      >
-                                        Rename
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          if (confirm(`Delete "${s.name}"?`)) {
+                                      {deletingScheduleId === s.id ? (
+                                        <div className="flex gap-2 items-center bg-red-50 px-2 py-0.5 rounded border border-red-200">
+                                          <span className="text-xs font-bold text-red-700">Sure?</span>
+                                          <button type="button" onClick={() => {
                                             deleteMatchupSchedule(s.id);
+                                            clearResultsState(s.id);
                                             setSavedSchedules(loadMatchupSchedules());
-                                          }
-                                        }}
-                                        className="text-red-500 text-xs font-medium hover:underline"
-                                      >
-                                        Delete
-                                      </button>
+                                            setDeletingScheduleId(null);
+                                          }} className="bg-red-600 text-white px-2 rounded-sm text-xs font-bold hover:bg-red-700">Yes</button>
+                                          <button type="button" onClick={() => setDeletingScheduleId(null)} className="text-slate-600 text-xs font-medium hover:underline">Cancel</button>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setGeneratedMatchups(s.matchups);
+                                              setRoundRobinCount(s.roundRobinCount);
+                                              setDrawConfirmed(true);
+                                              setShowRoundRobinPrompt(false);
+                                              setLastResult({
+                                                success: true,
+                                                groups: s.groups,
+                                                logs: [`Loaded schedule: ${s.name}`],
+                                                executionTimeMs: 0,
+                                              });
+                                            }}
+                                            className="text-blue-600 text-xs font-medium hover:underline"
+                                          >
+                                            Load
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setEditingScheduleId(s.id);
+                                              setEditingScheduleName(s.name);
+                                            }}
+                                            className="text-slate-500 text-xs font-medium hover:underline"
+                                          >
+                                            Rename
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => setDeletingScheduleId(s.id)}
+                                            className="text-red-500 text-xs font-medium hover:underline"
+                                          >
+                                            Delete
+                                          </button>
+                                        </>
+                                      )}
                                     </div>
                                   </>
                                 )}
@@ -745,10 +776,70 @@ const App = () => {
 
                       {/* Bracket Visualization */}
                       {lastEliminationResult.success && (
-                        <EliminationBracketView
-                          bracket={lastEliminationResult.bracket}
-                          showResult={true}
-                        />
+                        <>
+                          <EliminationBracketView
+                            bracket={lastEliminationResult.bracket}
+                            showResult={true}
+                          />
+                          {!drawConfirmed && (
+                            <div className="bg-orange-50 border border-orange-200 rounded-lg p-6 mt-6">
+                              <h4 className="font-bold text-orange-800 mb-2">Save Bracket & Start Tournament</h4>
+                              <p className="text-orange-600 text-sm mb-4">
+                                Save this bracket to record match scores and advance teams to the next round.
+                              </p>
+                              <div className="flex items-center justify-center gap-3">
+                                <input
+                                  type="text"
+                                  placeholder="Tournament Name..."
+                                  className="w-64 p-2 border border-orange-300 rounded text-center text-lg font-bold"
+                                  value={eliminationSaveName}
+                                  onChange={(e) => setEliminationSaveName(e.target.value)}
+                                />
+                                <button
+                                  onClick={() => {
+                                    if (!eliminationSaveName.trim()) {
+                                      alert('Please enter a name for this tournament.');
+                                      return;
+                                    }
+                                    
+                                    const matchups: EliminationMatchup[] = [];
+                                    const slots = lastEliminationResult.bracket.slots;
+                                    for (let i = 0; i < slots.length; i += 2) {
+                                        matchups.push({
+                                            id: Math.random().toString(36).substr(2, 9),
+                                            roundIndex: 0,
+                                            matchIndex: Math.floor(i / 2),
+                                            slot1: slots[i],
+                                            slot2: slots[i+1]
+                                        });
+                                    }
+
+                                    const schedule: SavedEliminationSchedule = {
+                                      id: Math.random().toString(36).substring(2, 9),
+                                      name: eliminationSaveName.trim(),
+                                      createdAt: new Date().toISOString(),
+                                      bracket: {
+                                        ...lastEliminationResult.bracket,
+                                        rounds: [lastEliminationResult.bracket.slots]
+                                      },
+                                      currentRoundIndex: 0,
+                                      matchups,
+                                      isComplete: false,
+                                      history: [matchups]
+                                    };
+                                    saveEliminationSchedule(schedule);
+                                    setSavedEliminationSchedules(loadEliminationSchedules());
+                                    setDrawConfirmed(true);
+                                    setActiveTab('eliminationResults');
+                                  }}
+                                  className="bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-orange-700 transition"
+                                >
+                                  Save & Begin
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   )
@@ -758,6 +849,10 @@ const App = () => {
 
             {activeTab === 'results' && drawMode === 'group' && (
               <ResultsRankings />
+            )}
+
+            {activeTab === 'eliminationResults' && drawMode === 'elimination' && (
+              <EliminationMatchManager />
             )}
 
           </div>

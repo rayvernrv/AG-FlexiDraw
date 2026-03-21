@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { SavedMatchupSchedule, GameCategory, MatchResult, GameResult, RankingRule, RankingEntry } from '../types';
-import { loadMatchupSchedules, loadResultsState, saveResultsState, clearResultsState } from '../services/storageService';
+import { loadMatchupSchedules, loadResultsState, saveResultsState, clearResultsState, updateMatchupSchedule, deleteMatchupSchedule } from '../services/storageService';
 import { computeRankings, DEFAULT_RANKING_RULES } from '../services/rankingEngine';
 
 export const ResultsRankings: React.FC = () => {
     const [schedules, setSchedules] = useState<SavedMatchupSchedule[]>([]);
     const [activeScheduleId, setActiveScheduleId] = useState<string>('');
+    const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+    const [editingScheduleName, setEditingScheduleName] = useState('');
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     // Game Categories Setup
     const [categories, setCategories] = useState<GameCategory[]>([]);
@@ -39,6 +42,7 @@ export const ResultsRankings: React.FC = () => {
             setResults({});
             setRules(DEFAULT_RANKING_RULES);
         }
+        setShowDeleteConfirm(false);
     }, [activeScheduleId]);
 
     useEffect(() => {
@@ -178,6 +182,41 @@ export const ResultsRankings: React.FC = () => {
                         ))}
                     </select>
                 )}
+                {activeScheduleId && (
+                    <div className="mt-4">
+                        {editingScheduleId === activeScheduleId ? (
+                            <div className="flex gap-2 w-full md:w-1/2">
+                                <input type="text" className="p-2 border rounded-lg flex-1" value={editingScheduleName} onChange={e => setEditingScheduleName(e.target.value)} />
+                                <button type="button" onClick={(e) => { 
+                                    e.preventDefault();
+                                    if (activeSchedule) {
+                                        updateMatchupSchedule(activeScheduleId, { ...activeSchedule, name: editingScheduleName }); 
+                                        setSchedules(loadMatchupSchedules()); 
+                                    }
+                                    setEditingScheduleId(null); 
+                                }} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm">Save</button>
+                                <button type="button" onClick={(e) => { e.preventDefault(); setEditingScheduleId(null); }} className="bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-bold text-sm">Cancel</button>
+                            </div>
+                        ) : showDeleteConfirm ? (
+                            <div className="flex gap-3 items-center bg-red-50 px-3 py-1.5 rounded-lg border border-red-200">
+                                <span className="text-sm font-bold text-red-700">Are you sure?</span>
+                                <button type="button" onClick={() => {
+                                    deleteMatchupSchedule(activeScheduleId);
+                                    clearResultsState(activeScheduleId);
+                                    setSchedules(loadMatchupSchedules());
+                                    setActiveScheduleId('');
+                                    setShowDeleteConfirm(false);
+                                }} className="bg-red-600 text-white px-3 py-1 rounded text-sm font-bold hover:bg-red-700 shadow-sm">Yes, Delete</button>
+                                <button type="button" onClick={() => setShowDeleteConfirm(false)} className="text-slate-600 hover:text-slate-800 hover:underline text-sm font-medium px-2">Cancel</button>
+                            </div>
+                        ) : (
+                            <div className="flex gap-4">
+                                <button type="button" onClick={(e) => { e.preventDefault(); setEditingScheduleId(activeScheduleId); setEditingScheduleName(activeSchedule?.name || ''); }} className="text-blue-600 font-semibold hover:underline px-3 py-1.5 text-sm border bg-blue-50 border-blue-200 rounded-lg">Rename</button>
+                                <button type="button" onClick={(e) => { e.preventDefault(); setShowDeleteConfirm(true); }} className="text-red-600 font-semibold hover:underline px-3 py-1.5 text-sm border bg-red-50 border-red-200 rounded-lg">Delete</button>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {activeSchedule && (
@@ -267,20 +306,22 @@ export const ResultsRankings: React.FC = () => {
                                                                                     return (
                                                                                         <div key={setIdx} className="flex justify-center items-center gap-4">
                                                                                             <div className="text-xs font-bold text-slate-400 w-12 text-right">Set {setIdx + 1}</div>
-                                                                                            <input type="number" min="0" className="w-16 p-1 border rounded text-center font-mono"
-                                                                                                value={setScore.teamAPoints !== undefined && setScore.teamAPoints !== null ? setScore.teamAPoints : ''}
-                                                                                                onChange={e => handleSetScoreChange(match.id, cat.id, setIdx, 'teamAPoints', e.target.value === '' ? null : parseInt(e.target.value, 10))} />
+                                                                                            <DecimalInput
+                                                                                                value={setScore.teamAPoints !== undefined ? setScore.teamAPoints : null}
+                                                                                                onChange={val => handleSetScoreChange(match.id, cat.id, setIdx, 'teamAPoints', val)}
+                                                                                            />
                                                                                             <div className="text-slate-300 font-bold">-</div>
-                                                                                            <input type="number" min="0" className="w-16 p-1 border rounded text-center font-mono"
-                                                                                                value={setScore.teamBPoints !== undefined && setScore.teamBPoints !== null ? setScore.teamBPoints : ''}
-                                                                                                onChange={e => handleSetScoreChange(match.id, cat.id, setIdx, 'teamBPoints', e.target.value === '' ? null : parseInt(e.target.value, 10))} />
+                                                                                            <DecimalInput
+                                                                                                value={setScore.teamBPoints !== undefined ? setScore.teamBPoints : null}
+                                                                                                onChange={val => handleSetScoreChange(match.id, cat.id, setIdx, 'teamBPoints', val)}
+                                                                                            />
                                                                                         </div>
                                                                                     );
                                                                                 })}
                                                                             </div>
                                                                             <div className="mt-3 pt-2 border-t border-slate-200 flex justify-center gap-6 text-xs font-medium text-slate-500">
                                                                                 <div>Sets: <span className="text-blue-700 font-bold">{gameRes.teamASets}</span> - <span className="text-purple-700 font-bold">{gameRes.teamBSets}</span></div>
-                                                                                <div>Total Pts: <span className="font-bold">{gameRes.teamAPoints}</span> - <span className="font-bold">{gameRes.teamBPoints}</span></div>
+                                                                                <div>Total Pts: <span className="font-bold">{Number(gameRes.teamAPoints.toFixed(2))}</span> - <span className="font-bold">{Number(gameRes.teamBPoints.toFixed(2))}</span></div>
                                                                             </div>
                                                                         </div>
                                                                     );
@@ -360,14 +401,14 @@ export const ResultsRankings: React.FC = () => {
                                                                     {entry.setDifference > 0 ? '+' : ''}{entry.setDifference}
                                                                 </span>
                                                             </td>
-                                                            <td className="px-4 py-2 text-center text-xs text-slate-500">{entry.totalPointsWon}</td>
-                                                            <td className="px-4 py-2 text-center text-xs text-slate-500">{entry.totalPointsLost}</td>
+                                                            <td className="px-4 py-2 text-center text-xs text-slate-500">{Number(entry.totalPointsWon.toFixed(2))}</td>
+                                                            <td className="px-4 py-2 text-center text-xs text-slate-500">{Number(entry.totalPointsLost.toFixed(2))}</td>
                                                             <td className="px-4 py-2 text-center font-mono text-xs">
                                                                 <span className={entry.totalPointsDifference > 0 ? 'text-green-600' : entry.totalPointsDifference < 0 ? 'text-red-500' : 'text-slate-400'}>
-                                                                    {entry.totalPointsDifference > 0 ? '+' : ''}{entry.totalPointsDifference}
+                                                                    {entry.totalPointsDifference > 0 ? '+' : ''}{Number(entry.totalPointsDifference.toFixed(2))}
                                                                 </span>
                                                             </td>
-                                                            <td className="px-4 py-2 text-center font-bold text-xs text-slate-700">{entry.deltaPointsPerGame}</td>
+                                                            <td className="px-4 py-2 text-center font-bold text-xs text-slate-700">{Number(entry.deltaPointsPerGame.toFixed(2))}</td>
                                                             <td className="px-4 py-2 text-center text-xs text-orange-600 italic">
                                                                 {entry.tiebreakerNote}
                                                             </td>
@@ -385,4 +426,29 @@ export const ResultsRankings: React.FC = () => {
             )}
         </div>
     );
+};
+
+const DecimalInput: React.FC<{ value: number | null, onChange: (val: number | null) => void }> = ({ value, onChange }) => {
+    const [local, setLocal] = useState(value !== null ? String(value) : '');
+    useEffect(() => {
+        if (value === null) setLocal('');
+        else if (parseFloat(local) !== value) {
+            setLocal(String(value));
+        }
+    }, [value]);
+    
+    return <input type="number" step="0.01" min="0" className="w-16 p-1 border rounded text-center font-mono focus:ring-2 focus:ring-brand-500 outline-none" 
+        value={local} 
+        onKeyDown={e => {
+            if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                e.preventDefault();
+            }
+        }}
+        onChange={e => {
+            const v = e.target.value;
+            if (v !== '' && !/^\d*\.?\d{0,2}$/.test(v)) return;
+            setLocal(v);
+            onChange(v === '' ? null : parseFloat(v));
+        }} 
+    />;
 };

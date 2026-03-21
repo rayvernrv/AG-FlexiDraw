@@ -64,8 +64,14 @@ export const EliminationConfig: React.FC<EliminationConfigProps> = ({
     const handleRoundChange = (value: string) => {
         const round = ELIMINATION_ROUNDS.find(r => r.value === value);
         if (round) {
-            setEliminationBracket({ roundName: round.label, totalSlots: round.slots, slots: generateSlots(round.slots) });
-            setTeamListText('');
+            const newSlots = generateSlots(round.slots);
+            for (let i = 0; i < Math.min(newSlots.length, eliminationBracket.slots.length); i++) {
+                if (eliminationBracket.slots[i].team) {
+                    newSlots[i].team = eliminationBracket.slots[i].team;
+                    newSlots[i].isFixed = eliminationBracket.slots[i].isFixed;
+                }
+            }
+            setEliminationBracket({ roundName: round.label, totalSlots: round.slots, slots: newSlots });
         }
     };
 
@@ -471,22 +477,20 @@ const EditableSlot: React.FC<{
     const isDuplicate = slot.team?.name && teamCounts && teamCounts[slot.team.name.toLowerCase().trim()] > 1;
 
     return (
-        <div className={`flex items-center gap-1 px-1 transition-colors ${
-            isLocked ? 'bg-yellow-50' : 
-            isDuplicate ? 'bg-red-50 border border-red-200 ring-1 ring-inset ring-red-200' :
-            isEmpty ? 'bg-red-50/30' : ''
-        }`}>
+        <div className={`flex items-center gap-1 px-1 transition-colors ${isLocked ? 'bg-yellow-50' :
+                isDuplicate ? 'bg-red-50 border border-red-200 ring-1 ring-inset ring-red-200' :
+                    isEmpty ? 'bg-red-50/30' : ''
+            }`}>
             <input type="text"
-                className={`px-2 py-1.5 text-xs flex-1 bg-transparent outline-none min-w-0 ${
-                    isLocked ? 'text-yellow-800 font-medium' : 
-                    isDuplicate ? 'text-red-800 font-bold' :
-                    isEmpty ? 'placeholder:text-red-300' : 'text-slate-700'
-                }`}
+                className={`px-2 py-1.5 text-xs flex-1 bg-transparent outline-none min-w-0 ${isLocked ? 'text-yellow-800 font-medium' :
+                        isDuplicate ? 'text-red-800 font-bold' :
+                            isEmpty ? 'placeholder:text-red-300' : 'text-slate-700'
+                    }`}
                 placeholder={`Slot ${slot.position + 1}`}
                 value={slot.team?.name || ''}
                 onChange={(e) => onNameChange(slot.id, e.target.value)}
                 disabled={isLocked} />
-            
+
             {isDuplicate && (
                 <span className="text-[10px] text-red-500 font-bold px-1 animate-pulse" title="Duplicate Name detected!">⚠️</span>
             )}
