@@ -68,6 +68,7 @@ export interface EliminationBracket {
   roundName: string;           // e.g. "Round of 16"
   totalSlots: number;          // e.g. 16
   slots: BracketSlot[];        // All slots in first round
+  rounds?: BracketSlot[][];    // slots for each round: rounds[0] = 1st round, rounds[1] = 2nd round, etc.
 }
 
 export interface EliminationDrawResult {
@@ -77,6 +78,25 @@ export interface EliminationDrawResult {
 }
 
 // ==================== MATCHUP & SCHEDULE TYPES ====================
+
+export interface EliminationMatchup {
+  id: string;
+  roundIndex: number;
+  matchIndex: number; // 0, 1, 2, etc. relative to the round
+  slot1: BracketSlot;
+  slot2: BracketSlot;
+}
+
+export interface SavedEliminationSchedule {
+  id: string;
+  name: string;
+  createdAt: string;
+  bracket: EliminationBracket; // Snapshot of the bracket
+  currentRoundIndex: number;
+  matchups: EliminationMatchup[]; // Matchups for the CURRENT round
+  isComplete: boolean;
+  history?: EliminationMatchup[][]; // Stores matchups of past rounds
+}
 
 export interface Matchup {
   id: string;

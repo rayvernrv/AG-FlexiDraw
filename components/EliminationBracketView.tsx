@@ -4,6 +4,12 @@ import { EliminationBracket, BracketSlot } from '../types';
 interface EliminationBracketViewProps {
     bracket: EliminationBracket;
     showResult?: boolean;
+    getMatchScore?: (roundIndex: number, matchIndex: number) => { teamAScore: number; teamBScore: number } | null;
+}
+
+interface MatchScore {
+    teamAScore: number;
+    teamBScore: number;
 }
 
 interface MatchupData {
@@ -32,7 +38,7 @@ const getMatchups = (slots: BracketSlot[]): MatchupData[] => {
 };
 
 export const EliminationBracketView: React.FC<EliminationBracketViewProps> = ({
-    bracket, showResult = false
+    bracket, showResult = false, getMatchScore
 }) => {
     const totalSlots = bracket.totalSlots;
     const halfwayPoint = totalSlots / 2;
@@ -86,7 +92,7 @@ export const EliminationBracketView: React.FC<EliminationBracketViewProps> = ({
             <div className="mt-8 pt-6 border-t border-slate-200">
                 <h4 className="font-bold text-slate-700 mb-4 text-center">Full Bracket View</h4>
                 <div className="overflow-x-auto">
-                    <MirroredBracketVisualization bracket={bracket} numRounds={numRounds} />
+                    <MirroredBracketVisualization bracket={bracket} numRounds={numRounds} getMatchScore={getMatchScore} />
                 </div>
             </div>
         </div>
@@ -133,13 +139,17 @@ const TeamSlot: React.FC<{ slot: BracketSlot | null }> = ({ slot }) => {
 
 // ──── Mirrored Bracket Visualization ────
 
-const MirroredBracketVisualization: React.FC<{ bracket: EliminationBracket; numRounds: number }> = ({ bracket, numRounds }) => {
+interface MirroredBracketProps {
+    bracket: EliminationBracket;
+    numRounds: number;
+    getMatchScore?: (roundIndex: number, matchIndex: number) => { teamAScore: number; teamBScore: number } | null;
+}
+
+const MirroredBracketVisualization: React.FC<MirroredBracketProps> = ({ bracket, numRounds, getMatchScore }) => {
     const totalSlots = bracket.totalSlots;
     const halfwayPoint = totalSlots / 2;
-    const topHalfSlots = bracket.slots.filter(s => s.position < halfwayPoint);
-    const bottomHalfSlots = bracket.slots.filter(s => s.position >= halfwayPoint);
-    const topMatchups = getMatchups(topHalfSlots);
-    const bottomMatchups = getMatchups(bottomHalfSlots);
+    // Base rounds mapping
+    const roundsData = bracket.rounds || [bracket.slots];
 
     // Half-specific rounds (excluding the final)
     const halfRounds = numRounds - 1;
@@ -162,69 +172,82 @@ const MirroredBracketVisualization: React.FC<{ bracket: EliminationBracket; numR
         return (
             <div className="flex items-center gap-8 p-4 w-full">
                 <div className="flex-1">
-                    <MiniMatchupCardStatic slot={bracket.slots[0]} />
+                    <MiniMatchupCardStatic slot={roundsData[0][0]} />
                 </div>
                 <div className="text-center">
                     <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Final</div>
-                    <div className="border-2 border-yellow-400 bg-gradient-to-br from-yellow-50 to-amber-50 rounded-lg p-4 text-center shadow-md">
-                        <span className="text-2xl">🏆</span>
-                        <div className="text-sm font-bold text-amber-800 mt-2">Champion</div>
-                    </div>
+                    <ChampionCard slot={roundsData[1] ? roundsData[1][0] : undefined} />
                 </div>
                 <div className="flex-1">
-                    <MiniMatchupCardStatic slot={bracket.slots[1]} />
+                    <MiniMatchupCardStatic slot={roundsData[0][1]} />
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="flex items-stretch w-full p-4 gap-3">
+        <div className="flex items-stretch justify-center w-full p-4 gap-4 md:gap-8">
             {/* ──── LEFT SIDE: Top Half (flows left → right) ──── */}
-            {halfRoundStructure.map((round, ri) => (
-                <div key={`left-${ri}`} className="flex flex-col justify-around flex-1">
-                    <div className="text-center text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">{round.name}</div>
-                    <div className="flex flex-col justify-around flex-1">
-                        {ri === 0 ? (
-                            topMatchups.map((matchup, idx) => (
-                                <div key={idx} className="mb-2" style={{ marginTop: ri * 10, marginBottom: ri * 10 }}>
-                                    <MiniMatchupCard matchup={matchup} />
-                                </div>
-                            ))
-                        ) : (
-                            Array.from({ length: round.matchCount }).map((_, idx) => (
-                                <div key={idx} className="mb-2" style={{ marginTop: ri * 20, marginBottom: ri * 20 }}>
-                                    <EmptyMatchupCard />
-                                </div>
-                            ))
-                        )}
+            {halfRoundStructure.map((round, ri) => {
+                const roundSlots = roundsData[ri];
+                const halfCountIfAny = (totalSlots / 2) / Math.pow(2, ri);
+                const topSlots = roundSlots ? roundSlots.filter(s => s.position < halfCountIfAny) : null;
+                const topMatchups = topSlots ? getMatchups(topSlots) : [];
+
+                return (
+                    <div key={`left-${ri}`} className="flex flex-col justify-around w-32 md:w-48 shrink-0">
+                        <div className="text-center text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">{round.name}</div>
+                        <div className="flex flex-col justify-around flex-1">
+                            {topMatchups.length > 0 ? (
+                                topMatchups.map((matchup, idx) => (
+                                    <div key={idx} className="mb-2" style={{ marginTop: ri * 10, marginBottom: ri * 10 }}>
+                                        <MiniMatchupCard matchup={matchup} score={getMatchScore?.(ri, matchup.matchNumber - 1)} />
+                                    </div>
+                                ))
+                            ) : (
+                                Array.from({ length: round.matchCount }).map((_, idx) => (
+                                    <div key={idx} className="mb-2" style={{ marginTop: ri * 20, marginBottom: ri * 20 }}>
+                                        <EmptyMatchupCard />
+                                    </div>
+                                ))
+                            )}
+                        </div>
                     </div>
-                </div>
-            ))}
+                );
+            })}
 
             {/* ──── CENTER: Final + Champion ──── */}
-            <div className="flex flex-col justify-center items-center px-4" style={{ minWidth: '130px' }}>
-                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Final</div>
-                <div className="mb-4">
-                    <EmptyMatchupCard />
+            <div className="flex flex-col justify-center items-center px-4 shrink-0">
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 text-center">Final</div>
+                <div className="mb-6">
+                    {roundsData[halfRounds] ? (
+                        <GrandMatchupCard matchup={getMatchups(roundsData[halfRounds])[0]} score={getMatchScore?.(halfRounds, 0)} />
+                    ) : (
+                        <div className="border border-slate-200 rounded bg-slate-50 shadow-sm w-48">
+                            <div className="px-2 py-3 text-sm font-bold text-slate-400 border-b border-slate-200 text-center">—</div>
+                            <div className="px-2 py-3 text-sm font-bold text-slate-400 text-center">—</div>
+                        </div>
+                    )}
                 </div>
-                <div className="border-2 border-yellow-400 bg-gradient-to-br from-yellow-50 to-amber-50 rounded-lg p-4 text-center shadow-md">
-                    <span className="text-2xl">🏆</span>
-                    <div className="text-sm font-bold text-amber-800 mt-2">Champion</div>
-                </div>
+                <ChampionCard slot={roundsData[halfRounds + 1] ? roundsData[halfRounds + 1][0] : undefined} />
             </div>
 
             {/* ──── RIGHT SIDE: Bottom Half (flows right → left, reversed columns) ──── */}
             {[...halfRoundStructure].reverse().map((round, ri) => {
                 const actualRoundIdx = halfRounds - 1 - ri; // reverse index
+                const roundSlots = roundsData[actualRoundIdx];
+                const halfCountIfAny = (totalSlots / 2) / Math.pow(2, actualRoundIdx);
+                const bottomSlots = roundSlots ? roundSlots.filter(s => s.position >= halfCountIfAny) : null;
+                const bottomMatchups = bottomSlots ? getMatchups(bottomSlots) : [];
+
                 return (
-                    <div key={`right-${ri}`} className="flex flex-col justify-around flex-1">
+                    <div key={`right-${ri}`} className="flex flex-col justify-around w-32 md:w-48 shrink-0">
                         <div className="text-center text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">{round.name}</div>
                         <div className="flex flex-col justify-around flex-1">
-                            {actualRoundIdx === 0 ? (
+                            {bottomMatchups.length > 0 ? (
                                 bottomMatchups.map((matchup, idx) => (
                                     <div key={idx} className="mb-2" style={{ marginTop: actualRoundIdx * 10, marginBottom: actualRoundIdx * 10 }}>
-                                        <MiniMatchupCard matchup={matchup} />
+                                        <MiniMatchupCard matchup={matchup} score={getMatchScore?.(actualRoundIdx, matchup.matchNumber - 1)} />
                                     </div>
                                 ))
                             ) : (
@@ -244,24 +267,29 @@ const MirroredBracketVisualization: React.FC<{ bracket: EliminationBracket; numR
 
 // ──── Mini Components ────
 
-const MiniMatchupCard: React.FC<{ matchup: MatchupData }> = ({ matchup }) => (
-    <div className="border border-slate-200 rounded bg-white shadow-sm">
-        <MiniTeamSlot slot={matchup.slot1} />
+const MiniMatchupCard: React.FC<{ matchup: MatchupData, score?: MatchScore | null }> = ({ matchup, score }) => (
+    <div className="border border-slate-200 rounded bg-white shadow-sm flex flex-col">
+        <MiniTeamSlot slot={matchup.slot1} score={score?.teamAScore} />
         <div className="h-px bg-slate-200"></div>
-        <MiniTeamSlot slot={matchup.slot2} />
+        <MiniTeamSlot slot={matchup.slot2} score={score?.teamBScore} />
     </div>
 );
 
-const MiniTeamSlot: React.FC<{ slot: BracketSlot | null }> = ({ slot }) => {
+const MiniTeamSlot: React.FC<{ slot: BracketSlot | null, score?: number | null }> = ({ slot, score }) => {
     if (!slot || !slot.team) {
-        return <div className="px-2 py-1.5 text-xs text-slate-400 bg-slate-50">TBD</div>;
+        return <div className="px-2 py-1.5 text-xs text-slate-400 bg-slate-50 flex justify-between h-[30px] items-center"><span>TBD</span></div>;
     }
     return (
-        <div className={`px-2 py-1.5 text-xs flex items-center gap-1 ${slot.isFixed ? 'bg-yellow-50' : ''}`}>
-            {slot.team.seed && (
-                <span className="bg-yellow-200 text-yellow-800 px-1 rounded text-[10px] font-bold">{slot.team.seed}</span>
+        <div className={`px-2 py-1.5 text-xs flex justify-between items-center gap-1 h-[30px] ${slot.isFixed ? 'bg-yellow-50' : ''}`}>
+            <div className="flex items-center gap-1 overflow-hidden">
+                {slot.team.seed && (
+                    <span className="bg-yellow-200 text-yellow-800 px-1 rounded text-[10px] font-bold shrink-0">{slot.team.seed}</span>
+                )}
+                <span className="font-medium truncate">{slot.team.name}</span>
+            </div>
+            {score !== null && score !== undefined && (
+                <span className="font-bold text-slate-700 bg-slate-100 border border-slate-200 px-1.5 rounded ml-1 shrink-0">{score}</span>
             )}
-            <span className="font-medium truncate flex-1">{slot.team.name}</span>
         </div>
     );
 };
@@ -274,7 +302,46 @@ const MiniMatchupCardStatic: React.FC<{ slot: BracketSlot | null }> = ({ slot })
 
 const EmptyMatchupCard: React.FC = () => (
     <div className="border border-slate-200 rounded bg-slate-50 shadow-sm">
-        <div className="px-2 py-1.5 text-xs text-slate-400 border-b border-slate-200">—</div>
-        <div className="px-2 py-1.5 text-xs text-slate-400">—</div>
+        <div className="px-2 py-1.5 text-xs text-slate-400 border-b border-slate-200 text-center">—</div>
+        <div className="px-2 py-1.5 text-xs text-slate-400 text-center">—</div>
+    </div>
+);
+
+const GrandMatchupCard: React.FC<{ matchup: MatchupData, score?: MatchScore | null }> = ({ matchup, score }) => (
+    <div className="border-2 border-orange-300 rounded-xl bg-gradient-to-br from-white to-orange-50 shadow-md overflow-hidden min-w-[12rem] md:min-w-[16rem]">
+        <GrandTeamSlot slot={matchup.slot1} score={score?.teamAScore} />
+        <div className="h-0.5 bg-orange-200"></div>
+        <GrandTeamSlot slot={matchup.slot2} score={score?.teamBScore} />
+    </div>
+);
+
+const GrandTeamSlot: React.FC<{ slot: BracketSlot | null, score?: number | null }> = ({ slot, score }) => {
+    if (!slot || !slot.team) {
+        return <div className="px-4 py-3 text-sm font-bold text-slate-400 flex justify-center uppercase tracking-wider h-[46px] items-center">TBD</div>;
+    }
+    return (
+        <div className={`px-4 py-3 flex items-center justify-between gap-2 h-[46px] ${slot.isFixed ? 'bg-yellow-100/50' : ''}`}>
+            <div className="flex gap-2 items-center overflow-hidden">
+                {slot.team.seed && (
+                    <span className="bg-orange-200 text-orange-900 px-1.5 py-0.5 rounded text-xs font-black shrink-0">{slot.team.seed}</span>
+                )}
+                <span className="font-bold text-lg text-slate-800 truncate">{slot.team.name}</span>
+            </div>
+            {score !== null && score !== undefined && (
+                <span className="font-black text-slate-700 bg-orange-100 border border-orange-200 px-2 py-0.5 rounded ml-1 shrink-0">{score}</span>
+            )}
+        </div>
+    );
+};
+
+const ChampionCard: React.FC<{ slot: BracketSlot | null | undefined }> = ({ slot }) => (
+    <div className="border-[3px] border-yellow-400 bg-gradient-to-br from-yellow-100 to-amber-50 rounded-2xl p-4 md:p-6 text-center shadow-lg min-w-[11rem] md:min-w-[14rem] mt-4 ring-4 ring-yellow-400/20 mx-auto">
+        <span className="text-4xl md:text-5xl block mb-2 drop-shadow-md">🏆</span>
+        <div className="text-sm md:text-base font-black text-amber-700 uppercase tracking-widest mb-2 border-b-2 border-amber-200/50 pb-1.5 inline-block px-3">Champion</div>
+        {slot?.team ? (
+            <div className="text-xl md:text-2xl font-black text-slate-900 truncate px-2 mt-1">{slot.team.name}</div>
+        ) : (
+            <div className="text-lg md:text-xl font-bold text-amber-600/30 uppercase tracking-widest mt-1">TBD</div>
+        )}
     </div>
 );

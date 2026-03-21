@@ -1,6 +1,7 @@
-import { SavedMatchupSchedule, GameCategory, MatchResult, RankingRule } from '../types';
+import { SavedMatchupSchedule, SavedEliminationSchedule, GameCategory, MatchResult, RankingRule } from '../types';
 
 const STORAGE_KEY = 'flexidraw_saved_schedules';
+const ELIMINATION_STORAGE_KEY = 'flexidraw_saved_elimination_schedules';
 const RESULTS_STORAGE_KEY_PREFIX = 'flexidraw_results_';
 
 export function loadMatchupSchedules(): SavedMatchupSchedule[] {
@@ -28,6 +29,33 @@ export function updateMatchupSchedule(id: string, updates: Partial<SavedMatchupS
         s.id === id ? { ...s, ...updates } : s
     );
     localStorage.setItem(STORAGE_KEY, JSON.stringify(schedules));
+}
+
+export function loadEliminationSchedules(): SavedEliminationSchedule[] {
+    try {
+        const raw = localStorage.getItem(ELIMINATION_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch {
+        return [];
+    }
+}
+
+export function saveEliminationSchedule(schedule: SavedEliminationSchedule): void {
+    const schedules = loadEliminationSchedules();
+    schedules.push(schedule);
+    localStorage.setItem(ELIMINATION_STORAGE_KEY, JSON.stringify(schedules));
+}
+
+export function deleteEliminationSchedule(id: string): void {
+    const schedules = loadEliminationSchedules().filter(s => s.id !== id);
+    localStorage.setItem(ELIMINATION_STORAGE_KEY, JSON.stringify(schedules));
+}
+
+export function updateEliminationSchedule(id: string, updates: Partial<SavedEliminationSchedule>): void {
+    const schedules = loadEliminationSchedules().map(s =>
+        s.id === id ? { ...s, ...updates } : s
+    );
+    localStorage.setItem(ELIMINATION_STORAGE_KEY, JSON.stringify(schedules));
 }
 
 export interface ResultsState {
