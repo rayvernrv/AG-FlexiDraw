@@ -805,10 +805,11 @@ const App = () => {
                                     const matchups: EliminationMatchup[] = [];
                                     const slots = lastEliminationResult.bracket.slots;
                                     for (let i = 0; i < slots.length; i += 2) {
+                                        const matchIndex = Math.floor(i / 2);
                                         matchups.push({
-                                            id: Math.random().toString(36).substr(2, 9),
+                                            id: `match-R0-M${matchIndex}`,
                                             roundIndex: 0,
-                                            matchIndex: Math.floor(i / 2),
+                                            matchIndex,
                                             slot1: slots[i],
                                             slot2: slots[i+1]
                                         });

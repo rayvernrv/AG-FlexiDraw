@@ -135,6 +135,8 @@ export interface GameResult {
 
 export interface MatchResult {
   matchupId: string;
+  teamAId?: string; // Optional for backward compatibility
+  teamBId?: string;
   games: GameResult[];
   isComplete: boolean;
   // Computed summaries for the match

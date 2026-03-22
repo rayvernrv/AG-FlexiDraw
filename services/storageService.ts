@@ -59,7 +59,8 @@ export function updateEliminationSchedule(id: string, updates: Partial<SavedElim
 }
 
 export interface ResultsState {
-    categories: GameCategory[];
+    categories?: GameCategory[]; // Legacy support
+    roundCategories?: Record<number, GameCategory[]>;
     results: Record<string, MatchResult>;
     rules: RankingRule[];
 }

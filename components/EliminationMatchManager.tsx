@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { EliminationBracket, SavedEliminationSchedule, GameCategory, MatchResult, EliminationMatchup, BracketSlot } from '../types';
 import { loadEliminationSchedules, saveEliminationSchedule, updateEliminationSchedule, deleteEliminationSchedule, loadResultsState, saveResultsState, clearResultsState } from '../services/storageService';
 import { EliminationBracketView } from './EliminationBracketView';
+import { exportEliminationResultsToCSV } from '../services/exportService';
 
 export const EliminationMatchManager: React.FC = () => {
     const [schedules, setSchedules] = useState<SavedEliminationSchedule[]>([]);
@@ -11,11 +12,13 @@ export const EliminationMatchManager: React.FC = () => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [showRewindConfirm, setShowRewindConfirm] = useState(false);
 
-    // Game Categories Setup
-    const [categories, setCategories] = useState<GameCategory[]>([]);
+    // Game Categories State: roundIndex -> GameCategory[]
+    const [roundCategories, setRoundCategories] = useState<Record<number, GameCategory[]>>({});
     const [newCatName, setNewCatName] = useState('');
     const [newCatType, setNewCatType] = useState<GameCategory['type']>('best_of_3');
 
+    // Filtering state
+    const [selectedFilters, setSelectedFilters] = useState<string[]>(['all']);
     // Match Results State: matchId -> MatchResult
     const [results, setResults] = useState<Record<string, MatchResult>>({});
 
@@ -27,15 +30,22 @@ export const EliminationMatchManager: React.FC = () => {
         if (activeScheduleId) {
             const savedState = loadResultsState(activeScheduleId);
             if (savedState) {
-                setCategories(savedState.categories || []);
+                // Migrate old flat categories to round-specific if needed
+                let rc = savedState.roundCategories || {};
+                if (Object.keys(rc).length === 0 && savedState.categories) {
+                    rc[0] = savedState.categories;
+                }
+                setRoundCategories(rc);
                 setResults(savedState.results || {});
             } else {
-                setCategories([]);
+                setRoundCategories({});
                 setResults({});
             }
+            setSelectedFilters(['all']);
         } else {
-            setCategories([]);
+            setRoundCategories({});
             setResults({});
+            setSelectedFilters(['all']);
         }
         setShowDeleteConfirm(false);
         setShowRewindConfirm(false);
@@ -44,35 +54,44 @@ export const EliminationMatchManager: React.FC = () => {
     useEffect(() => {
         if (activeScheduleId) {
             saveResultsState(activeScheduleId, {
-                categories,
+                roundCategories,
                 results,
                 rules: []
             });
         }
-    }, [categories, results, activeScheduleId]);
+    }, [roundCategories, results, activeScheduleId]);
 
     const activeSchedule = schedules.find(s => s.id === activeScheduleId);
+
+    const currentRoundIndex = activeSchedule?.currentRoundIndex ?? 0;
+    const currentCategories = roundCategories[currentRoundIndex] || [];
 
     // --- Category Management ---
     const addCategory = () => {
         if (!newCatName.trim()) return;
-        setCategories([...categories, {
-            id: Math.random().toString(36).substr(2, 9),
-            name: newCatName.trim(),
-            type: newCatType
-        }]);
+        setRoundCategories(prev => ({
+            ...prev,
+            [currentRoundIndex]: [...(prev[currentRoundIndex] || []), {
+                id: Math.random().toString(36).substr(2, 9),
+                name: newCatName.trim(),
+                type: newCatType
+            }]
+        }));
         setNewCatName('');
     };
 
     const removeCategory = (id: string) => {
-        setCategories(categories.filter(c => c.id !== id));
+        setRoundCategories(prev => ({
+            ...prev,
+            [currentRoundIndex]: (prev[currentRoundIndex] || []).filter(c => c.id !== id)
+        }));
     };
 
     const handleClearData = () => {
         if (!activeScheduleId) return;
         if (confirm('Are you sure you want to clear all recorded results and categories for this schedule?')) {
             clearResultsState(activeScheduleId);
-            setCategories([]);
+            setRoundCategories({});
             setResults({});
         }
     };
@@ -90,9 +109,15 @@ export const EliminationMatchManager: React.FC = () => {
     // --- Results Management ---
     const handleSetScoreChange = (matchId: string, catId: string, setIndex: number, field: 'teamAPoints' | 'teamBPoints', value: number | null) => {
         setResults(prev => {
+            const currentMatch = activeSchedule?.matchups.find(m => m.id === matchId);
+            const matchRoundIndex = currentMatch?.roundIndex ?? 0;
+            const matchCategories = roundCategories[matchRoundIndex] || [];
+
             const matchResult = prev[matchId] || {
                 matchupId: matchId,
-                games: categories.map(c => ({
+                teamAId: currentMatch?.slot1.team?.id,
+                teamBId: currentMatch?.slot2.team?.id,
+                games: matchCategories.map(c => ({
                     categoryId: c.id,
                     teamASets: 0,
                     teamBSets: 0,
@@ -105,10 +130,16 @@ export const EliminationMatchManager: React.FC = () => {
                 teamBMatchWins: 0
             };
 
+            // Maintain team IDs to track if matchup changes later (for highlighting)
+            if (currentMatch) {
+                matchResult.teamAId = currentMatch.slot1.team?.id;
+                matchResult.teamBId = currentMatch.slot2.team?.id;
+            }
+
             const games = matchResult.games.map(g => {
                 if (g.categoryId !== catId) return g;
 
-                const cat = categories.find(c => c.id === catId);
+                const cat = matchCategories.find(c => c.id === catId);
                 const maxSets = cat ? getMaxSets(cat.type) : 3;
                 let currentSetScores = g.setScores ? [...g.setScores] : [];
                 while (currentSetScores.length < maxSets) {
@@ -137,7 +168,7 @@ export const EliminationMatchManager: React.FC = () => {
             let teamAMatchWins = 0;
             let teamBMatchWins = 0;
             games.forEach(g => {
-                const cat = categories.find(c => c.id === g.categoryId);
+                const cat = matchCategories.find(c => c.id === g.categoryId);
                 const maxSets = cat ? getMaxSets(cat.type) : 3;
                 const setsToWin = Math.floor(maxSets / 2) + 1;
                 if (g.teamASets >= setsToWin) {
@@ -158,7 +189,7 @@ export const EliminationMatchManager: React.FC = () => {
         if (!activeSchedule) return;
 
         // Verify all matchups are complete (have a clear winner based on categories)
-        const categoriesCount = categories.length;
+        const categoriesCount = currentCategories.length;
         if (categoriesCount === 0) {
             alert("No categories defined. Please define categories and record scores before advancing.");
             return;
@@ -211,12 +242,14 @@ export const EliminationMatchManager: React.FC = () => {
 
         // Generate matchups for the next round if not final
         const nextMatchups: EliminationMatchup[] = [];
+        const nextRoundIndex = activeSchedule.currentRoundIndex + 1;
         if (!isFinal) {
             for (let i = 0; i < nextRoundSlots.length; i += 2) {
+                const matchIndex = Math.floor(i / 2);
                 nextMatchups.push({
-                    id: Math.random().toString(36).substr(2, 9),
-                    roundIndex: activeSchedule.currentRoundIndex + 1,
-                    matchIndex: Math.floor(i / 2),
+                    id: `match-R${nextRoundIndex}-M${matchIndex}`, // Deterministic ID
+                    roundIndex: nextRoundIndex,
+                    matchIndex,
                     slot1: nextRoundSlots[i],
                     slot2: nextRoundSlots[i + 1]
                 });
@@ -238,6 +271,15 @@ export const EliminationMatchManager: React.FC = () => {
         };
 
         updateEliminationSchedule(activeSchedule.id, updatedSchedule);
+        
+        // Inherit categories to next round if they don't exist
+        if (!isFinal && (!roundCategories[nextRoundIndex] || roundCategories[nextRoundIndex].length === 0)) {
+            setRoundCategories(prev => ({
+                ...prev,
+                [nextRoundIndex]: currentCategories.map(c => ({...c}))
+            }));
+        }
+
         setSchedules(loadEliminationSchedules());
 
         alert(isFinal ? "Tournament Complete! Showing Champion." : "Advanced to next round! New matchups generated.");
@@ -264,10 +306,11 @@ export const EliminationMatchManager: React.FC = () => {
             // Fallback generation for older saves that didn't have history array
             const prevSlots = newRounds[prevRoundIndex];
             for (let i = 0; i < prevSlots.length; i += 2) {
+                const matchIndex = Math.floor(i / 2);
                 restoredMatchups.push({
-                    id: Math.random().toString(36).substr(2, 9),
+                    id: `match-R${prevRoundIndex}-M${matchIndex}`,
                     roundIndex: prevRoundIndex,
-                    matchIndex: Math.floor(i / 2),
+                    matchIndex,
                     slot1: prevSlots[i],
                     slot2: prevSlots[i + 1]
                 });
@@ -368,7 +411,15 @@ export const EliminationMatchManager: React.FC = () => {
             {activeSchedule && (
                 <>
                     <div className="bg-white p-6 rounded-lg shadow border border-slate-200">
-                        <h2 className="text-xl font-bold text-slate-800 mb-4 text-center">Full Bracket View</h2>
+                        <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+                            <h2 className="text-xl font-bold text-slate-800">Full Bracket View</h2>
+                            <button 
+                                onClick={() => activeSchedule && exportEliminationResultsToCSV(activeSchedule, results, roundCategories)}
+                                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition flex items-center gap-2"
+                            >
+                                <span>📥 Export to Excel (CSV)</span>
+                            </button>
+                        </div>
                         <div className="overflow-x-auto">
                             <EliminationBracketView bracket={activeSchedule.bracket} showResult={true} getMatchScore={getMatchScore} />
                         </div>
@@ -429,22 +480,85 @@ export const EliminationMatchManager: React.FC = () => {
                             </div>
 
                             <div className="flex flex-wrap gap-2">
-                                {categories.map(cat => (
+                                {currentCategories.map(cat => (
                                     <div key={cat.id} className="bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-full flex items-center gap-2 text-sm font-medium text-slate-700">
                                         {cat.name} <span className="text-xs text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">{cat.type.replace(/_/g, ' ').toUpperCase()}</span>
                                         <button onClick={() => removeCategory(cat.id)} className="text-slate-400 hover:text-red-500">&times;</button>
                                     </div>
                                 ))}
-                                {categories.length === 0 && <span className="text-sm text-slate-400 italic">No categories defined yet. Add some to record scores.</span>}
+                                {currentCategories.length === 0 && <span className="text-sm text-slate-400 italic">No categories defined yet. Add some to record scores.</span>}
                             </div>
                         </div>
                     )}
 
-                    {!activeSchedule.isComplete && categories.length > 0 && (
+                    {!activeSchedule.isComplete && currentCategories.length > 0 && (
                         <div className="bg-white p-6 rounded-lg shadow border border-slate-200">
-                            <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-xl font-bold text-slate-800">3. Record Results (Current Round)</h2>
-                                <div className="flex gap-4">
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                                <div className="flex flex-wrap items-center gap-4">
+                                    <h2 className="text-xl font-bold text-slate-800">3. Record Results (Current Round)</h2>
+                                    
+                                    {/* Matchup Filter Dropdown */}
+                                    <div className="relative">
+                                        <div className="flex items-center bg-slate-100 border border-slate-200 rounded-lg p-1">
+                                            <button 
+                                                onClick={() => {
+                                                    const dropdown = document.getElementById('filter-dropdown');
+                                                    if (dropdown) dropdown.classList.toggle('hidden');
+                                                }}
+                                                className="px-3 py-1.5 text-sm font-medium text-slate-700 flex items-center gap-2 hover:bg-slate-200 rounded transition"
+                                            >
+                                                <span>🔍 Filter Matchups</span>
+                                                <span className="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                                                    {selectedFilters.includes('all') ? 'All' : selectedFilters.length}
+                                                </span>
+                                            </button>
+                                        </div>
+                                        
+                                        <div id="filter-dropdown" className="hidden absolute left-0 md:left-auto mt-2 w-64 bg-white border border-slate-200 rounded-lg shadow-xl z-20 max-h-80 overflow-y-auto p-2">
+                                            <label className="flex items-center gap-2 p-2 hover:bg-slate-50 cursor-pointer rounded border-b border-slate-100 mb-1">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={selectedFilters.includes('all')} 
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) setSelectedFilters(['all']);
+                                                        else setSelectedFilters([]);
+                                                    }}
+                                                />
+                                                <span className="text-sm font-bold text-slate-800">Select All Matchups</span>
+                                            </label>
+                                            {activeSchedule.matchups.map(m => (
+                                                <label key={m.id} className="flex items-center gap-2 p-2 hover:bg-slate-50 cursor-pointer rounded">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={selectedFilters.includes('all') || selectedFilters.includes(m.id)} 
+                                                        onChange={(e) => {
+                                                            let next;
+                                                            if (e.target.checked) {
+                                                                const base = selectedFilters.filter(f => f !== 'all');
+                                                                next = [...base, m.id];
+                                                                if (next.length === activeSchedule.matchups.length) next = ['all'];
+                                                                setSelectedFilters(next);
+                                                            } else {
+                                                                const base = selectedFilters.filter(f => f !== 'all');
+                                                                if (selectedFilters.includes('all')) {
+                                                                    next = activeSchedule.matchups.map(match => match.id).filter(id => id !== m.id);
+                                                                } else {
+                                                                    next = base.filter(id => id !== m.id);
+                                                                }
+                                                                setSelectedFilters(next);
+                                                            }
+                                                        }}
+                                                    />
+                                                    <span className="text-sm text-slate-700 truncate">
+                                                        {m.slot1.team?.name || 'TBD'} vs {m.slot2.team?.name || 'TBD'}
+                                                    </span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex flex-wrap items-center gap-3">
                                     {activeSchedule.currentRoundIndex > 0 && (
                                         showRewindConfirm ? (
                                             <div className="flex gap-2 items-center bg-yellow-50 px-3 py-1.5 rounded-lg border border-yellow-200">
@@ -472,8 +586,27 @@ export const EliminationMatchManager: React.FC = () => {
                                 </div>
                             </div>
 
+                            <div className="mb-6">
+                                <span className="bg-brand-100 text-brand-800 text-sm font-black px-4 py-1.5 rounded-full border border-brand-200 uppercase tracking-widest shadow-sm">
+                                    {(() => {
+                                        const totalTeams = activeSchedule.bracket.slots.length;
+                                        const totalRounds = Math.ceil(Math.log2(totalTeams));
+                                        const roundsRemaining = totalRounds - activeSchedule.currentRoundIndex;
+                                        switch (roundsRemaining) {
+                                            case 1: return "Finals";
+                                            case 2: return "Semi Finals";
+                                            case 3: return "Quarter Finals";
+                                            case 4: return "Round of 16";
+                                            case 5: return "Round of 32";
+                                            case 6: return "Round of 64";
+                                            default: return `Round ${activeSchedule.currentRoundIndex + 1}`;
+                                        }
+                                    })()}
+                                </span>
+                            </div>
+
                             <div className="space-y-6">
-                                {activeSchedule.matchups.map(match => {
+                                {activeSchedule.matchups.filter(m => selectedFilters.includes('all') || selectedFilters.includes(m.id)).map(match => {
                                     // if bye, show empty
                                     if (!match.slot1.team || !match.slot2.team) {
                                         return (
@@ -484,6 +617,13 @@ export const EliminationMatchManager: React.FC = () => {
                                     }
 
                                     const matchResult = results[match.id] || { teamAMatchWins: 0, teamBMatchWins: 0 };
+                                    
+                                    // Highlighting logic for affected matches (winning team changed in previous round)
+                                    const isStale = matchResult.isComplete && (
+                                        (matchResult.teamAId && matchResult.teamAId !== match.slot1.team.id) || 
+                                        (matchResult.teamBId && matchResult.teamBId !== match.slot2.team.id)
+                                    );
+
                                     const matchWinner = matchResult.teamAMatchWins > matchResult.teamBMatchWins
                                         ? match.slot1.team.name
                                         : matchResult.teamBMatchWins > matchResult.teamAMatchWins
@@ -491,7 +631,12 @@ export const EliminationMatchManager: React.FC = () => {
                                             : null;
 
                                     return (
-                                        <div key={match.id} className="border border-slate-200 rounded-lg overflow-hidden bg-white">
+                                        <div key={match.id} className={`border rounded-lg overflow-hidden bg-white transition-all ${isStale ? 'border-amber-400 ring-2 ring-amber-200' : 'border-slate-200'}`}>
+                                            {isStale && (
+                                                <div className="bg-amber-100 px-4 py-1 text-[10px] font-bold text-amber-800 uppercase tracking-widest text-center">
+                                                    ⚠️ Affected by score change in previous round
+                                                </div>
+                                            )}
                                             <div className="flex justify-between items-center mb-3 p-4 border-b border-slate-100">
                                                 <div className="flex-1 text-right font-bold text-blue-800 text-lg">
                                                     {match.slot1.team.name}
@@ -508,7 +653,7 @@ export const EliminationMatchManager: React.FC = () => {
                                             </div>
 
                                             <div className="p-4 space-y-4">
-                                                {categories.map(cat => {
+                                                {currentCategories.map(cat => {
                                                     const maxSets = getMaxSets(cat.type);
                                                     const gameRes = results[match.id]?.games.find(g => g.categoryId === cat.id) ||
                                                         { teamASets: 0, teamBSets: 0, setScores: Array.from({ length: maxSets }, () => ({ teamAPoints: null, teamBPoints: null })) };

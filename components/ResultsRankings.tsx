@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { SavedMatchupSchedule, GameCategory, MatchResult, GameResult, RankingRule, RankingEntry } from '../types';
 import { loadMatchupSchedules, loadResultsState, saveResultsState, clearResultsState, updateMatchupSchedule, deleteMatchupSchedule } from '../services/storageService';
 import { computeRankings, DEFAULT_RANKING_RULES } from '../services/rankingEngine';
+import { exportGroupResultsToCSV } from '../services/exportService';
 
 export const ResultsRankings: React.FC = () => {
     const [schedules, setSchedules] = useState<SavedMatchupSchedule[]>([]);
@@ -340,7 +341,15 @@ export const ResultsRankings: React.FC = () => {
                             {/* 4. Ranking Config & Tables (Right Side) */}
                             <div className="bg-white p-6 rounded-lg shadow border border-slate-200 xl:w-1/2 w-full">
                                 <div className="flex justify-between items-start mb-6 sticky top-24 bg-white z-10 py-2 border-b border-white">
-                                    <h2 className="text-xl font-bold text-slate-800">4. Live Rankings</h2>
+                                    <div className="flex flex-col gap-2">
+                                        <h2 className="text-xl font-bold text-slate-800">4. Live Rankings</h2>
+                                        <button 
+                                            onClick={() => activeSchedule && exportGroupResultsToCSV(activeSchedule, results, groupRankings, categories)}
+                                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm transition flex items-center gap-2"
+                                        >
+                                            <span>📥 Export to Excel (CSV)</span>
+                                        </button>
+                                    </div>
 
                                     {/* Rule Priority Configurator */}
                                     <div className="bg-slate-50 border border-slate-200 p-3 rounded text-sm w-72 shadow-sm">
