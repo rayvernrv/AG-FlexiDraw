@@ -201,7 +201,7 @@ const MirroredBracketVisualization: React.FC<MirroredBracketProps> = ({ bracket,
                             {topMatchups.length > 0 ? (
                                 topMatchups.map((matchup, idx) => (
                                     <div key={idx} className="mb-2" style={{ marginTop: ri * 10, marginBottom: ri * 10 }}>
-                                        <MiniMatchupCard matchup={matchup} score={getMatchScore?.(ri, matchup.matchNumber - 1)} />
+                                        <MiniMatchupCard matchup={matchup} score={getMatchScore?.(ri, idx)} />
                                     </div>
                                 ))
                             ) : (
@@ -237,6 +237,8 @@ const MirroredBracketVisualization: React.FC<MirroredBracketProps> = ({ bracket,
                 const actualRoundIdx = halfRounds - 1 - ri; // reverse index
                 const roundSlots = roundsData[actualRoundIdx];
                 const halfCountIfAny = (totalSlots / 2) / Math.pow(2, actualRoundIdx);
+                const topSlots = roundSlots ? roundSlots.filter(s => s.position < halfCountIfAny) : null;
+                const topMatchCount = topSlots ? getMatchups(topSlots).length : 0;
                 const bottomSlots = roundSlots ? roundSlots.filter(s => s.position >= halfCountIfAny) : null;
                 const bottomMatchups = bottomSlots ? getMatchups(bottomSlots) : [];
 
@@ -247,7 +249,7 @@ const MirroredBracketVisualization: React.FC<MirroredBracketProps> = ({ bracket,
                             {bottomMatchups.length > 0 ? (
                                 bottomMatchups.map((matchup, idx) => (
                                     <div key={idx} className="mb-2" style={{ marginTop: actualRoundIdx * 10, marginBottom: actualRoundIdx * 10 }}>
-                                        <MiniMatchupCard matchup={matchup} score={getMatchScore?.(actualRoundIdx, matchup.matchNumber - 1)} />
+                                        <MiniMatchupCard matchup={matchup} score={getMatchScore?.(actualRoundIdx, topMatchCount + idx)} />
                                     </div>
                                 ))
                             ) : (

@@ -3,6 +3,7 @@ import { EliminationBracket, SavedEliminationSchedule, GameCategory, MatchResult
 import { loadEliminationSchedules, saveEliminationSchedule, updateEliminationSchedule, deleteEliminationSchedule, loadResultsState, saveResultsState, clearResultsState } from '../services/storageService';
 import { EliminationBracketView } from './EliminationBracketView';
 import { exportEliminationResultsToCSV } from '../services/exportService';
+import { LiveLink } from './LiveLink';
 
 export const EliminationMatchManager: React.FC = () => {
     const [schedules, setSchedules] = useState<SavedEliminationSchedule[]>([]);
@@ -65,6 +66,39 @@ export const EliminationMatchManager: React.FC = () => {
 
     const currentRoundIndex = activeSchedule?.currentRoundIndex ?? 0;
     const currentCategories = roundCategories[currentRoundIndex] || [];
+
+    // Recalculate match wins when categories change (e.g. category removed/added)
+    useEffect(() => {
+        if (!activeSchedule || Object.keys(results).length === 0) return;
+        const matchCategories = roundCategories[currentRoundIndex] || [];
+        const catIds = new Set(matchCategories.map(c => c.id));
+
+        let changed = false;
+        const updated = { ...results };
+        for (const matchId of Object.keys(updated)) {
+            const mr = updated[matchId];
+            // Only recalc matches belonging to the current round
+            const match = activeSchedule.matchups.find(m => m.id === matchId);
+            if (!match) continue;
+
+            let teamAMatchWins = 0;
+            let teamBMatchWins = 0;
+            mr.games.forEach(g => {
+                if (!catIds.has(g.categoryId)) return; // skip removed categories
+                const cat = matchCategories.find(c => c.id === g.categoryId);
+                const maxSets = cat ? getMaxSets(cat.type) : 3;
+                const setsToWin = Math.floor(maxSets / 2) + 1;
+                if (g.teamASets >= setsToWin) teamAMatchWins++;
+                else if (g.teamBSets >= setsToWin) teamBMatchWins++;
+            });
+
+            if (mr.teamAMatchWins !== teamAMatchWins || mr.teamBMatchWins !== teamBMatchWins) {
+                updated[matchId] = { ...mr, teamAMatchWins, teamBMatchWins };
+                changed = true;
+            }
+        }
+        if (changed) setResults(updated);
+    }, [roundCategories, currentRoundIndex]);
 
     // --- Category Management ---
     const addCategory = () => {
@@ -136,7 +170,22 @@ export const EliminationMatchManager: React.FC = () => {
                 matchResult.teamBId = currentMatch.slot2.team?.id;
             }
 
-            const games = matchResult.games.map(g => {
+            // Ensure game entries exist for all current categories (handles categories added after initial scoring)
+            let currentGames = [...matchResult.games];
+            for (const cat of matchCategories) {
+                if (!currentGames.find(g => g.categoryId === cat.id)) {
+                    currentGames.push({
+                        categoryId: cat.id,
+                        teamASets: 0,
+                        teamBSets: 0,
+                        teamAPoints: 0,
+                        teamBPoints: 0,
+                        setScores: Array.from({ length: getMaxSets(cat.type) }, () => ({ teamAPoints: null, teamBPoints: null }))
+                    });
+                }
+            }
+
+            const games = currentGames.map(g => {
                 if (g.categoryId !== catId) return g;
 
                 const cat = matchCategories.find(c => c.id === catId);
@@ -164,10 +213,12 @@ export const EliminationMatchManager: React.FC = () => {
                 return { ...g, setScores: currentSetScores, teamASets, teamBSets, teamAPoints, teamBPoints };
             });
 
-            // Calculate overall Match Wins:
+            // Calculate overall Match Wins (only for currently defined categories):
+            const activeCatIds = new Set(matchCategories.map(c => c.id));
             let teamAMatchWins = 0;
             let teamBMatchWins = 0;
             games.forEach(g => {
+                if (!activeCatIds.has(g.categoryId)) return; // skip removed categories
                 const cat = matchCategories.find(c => c.id === g.categoryId);
                 const maxSets = cat ? getMaxSets(cat.type) : 3;
                 const setsToWin = Math.floor(maxSets / 2) + 1;
@@ -178,7 +229,7 @@ export const EliminationMatchManager: React.FC = () => {
                 }
             });
 
-            const isComplete = games.some(g => g.teamASets > 0 || g.teamBSets > 0);
+            const isComplete = games.some(g => activeCatIds.has(g.categoryId) && (g.teamASets > 0 || g.teamBSets > 0));
 
             return { ...prev, [matchId]: { ...matchResult, games, isComplete, teamAMatchWins, teamBMatchWins } };
         });
@@ -370,6 +421,22 @@ export const EliminationMatchManager: React.FC = () => {
                             <option key={s.id} value={s.id}>{s.name} ({s.isComplete ? 'Completed' : 'Round ' + (s.currentRoundIndex + 1)})</option>
                         ))}
                     </select>
+                )}
+
+                {activeSchedule && (
+                    <div className="mt-6">
+                        <LiveLink 
+                            name={activeSchedule.name}
+                            type="elimination"
+                            schedule={activeSchedule}
+                            resultsState={{ roundCategories, results, rules: [] }}
+                            currentLiveId={activeSchedule.liveId}
+                            onLiveIdCreated={(id) => {
+                                updateEliminationSchedule(activeSchedule.id, { ...activeSchedule, liveId: id });
+                                setSchedules(loadEliminationSchedules());
+                            }}
+                        />
+                    </div>
                 )}
                 {activeScheduleId && (
                     <div className="mt-4">
@@ -711,23 +778,23 @@ const DecimalInput: React.FC<{ value: number | null, onChange: (val: number | nu
     const [local, setLocal] = useState(value !== null ? String(value) : '');
     useEffect(() => {
         if (value === null) setLocal('');
-        else if (parseFloat(local) !== value) {
+        else if (parseInt(local) !== value) {
             setLocal(String(value));
         }
     }, [value]);
     
-    return <input type="number" step="0.01" min="0" className="w-16 p-1 border rounded text-center font-mono focus:ring-2 focus:ring-brand-500 outline-none" 
+    return <input type="number" step="1" min="0" className="w-16 p-1 border rounded text-center font-mono focus:ring-2 focus:ring-brand-500 outline-none" 
         value={local} 
         onKeyDown={e => {
-            if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+            if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E' || e.key === '.') {
                 e.preventDefault();
             }
         }}
         onChange={e => {
             const v = e.target.value;
-            if (v !== '' && !/^\d*\.?\d{0,2}$/.test(v)) return;
+            if (v !== '' && !/^\d+$/.test(v)) return;
             setLocal(v);
-            onChange(v === '' ? null : parseFloat(v));
+            onChange(v === '' ? null : parseInt(v, 10));
         }} 
     />;
 };
