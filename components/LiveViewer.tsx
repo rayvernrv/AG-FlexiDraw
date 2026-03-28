@@ -13,6 +13,13 @@ export const LiveViewer: React.FC<LiveViewerProps> = ({ tournamentId }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    const [viewState, setViewState] = useState<{
+        type: 'home' | 'groupMatchups' | 'matchDetails';
+        id?: string;
+    }>({ type: 'home' });
+
+    const goHome = () => setViewState({ type: 'home' });
+
     useEffect(() => {
         let subscription: { unsubscribe: () => void } | null = null;
 
@@ -94,7 +101,22 @@ export const LiveViewer: React.FC<LiveViewerProps> = ({ tournamentId }) => {
                 </div>
             </header>
 
-            {isElimination ? (
+            {viewState.type === 'matchDetails' && viewState.id ? (
+                <LiveMatchDetails 
+                    matchId={viewState.id} 
+                    schedule={schedule} 
+                    resultsState={resultsState} 
+                    onBack={() => setViewState(isElimination ? { type: 'home' } : { type: 'groupMatchups', id: (schedule as any).matchups?.find((m: any) => m.id === viewState.id)?.groupId })} 
+                />
+            ) : viewState.type === 'groupMatchups' && viewState.id ? (
+                <LiveGroupMatchups 
+                    groupId={viewState.id} 
+                    schedule={schedule} 
+                    resultsState={resultsState} 
+                    onBack={goHome} 
+                    onMatchClick={(matchId) => setViewState({ type: 'matchDetails', id: matchId })} 
+                />
+            ) : isElimination ? (
                 <div className="space-y-8">
                     {/* Live Match Summary (Ticker) */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -111,7 +133,9 @@ export const LiveViewer: React.FC<LiveViewerProps> = ({ tournamentId }) => {
                                 const match = (schedule.matchups as any[]).find(m => m.id === matchId);
                                 if (!match) return null;
                                 return (
-                                    <div key={matchId} className="bg-white p-4 rounded-xl border-l-4 border-l-brand-500 shadow-sm border border-slate-200 animate-pulse-slow">
+                                    <div key={matchId}
+                                        onClick={() => setViewState({ type: 'matchDetails', id: matchId })}
+                                        className="bg-white p-4 rounded-xl border-l-4 border-l-brand-500 shadow-sm border border-slate-200 animate-pulse-slow cursor-pointer hover:border-brand-500 hover:shadow-md transition">
                                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex justify-between">
                                             <span>Match In Progress</span>
                                             <span className="text-brand-600">Live</span>
@@ -128,9 +152,9 @@ export const LiveViewer: React.FC<LiveViewerProps> = ({ tournamentId }) => {
                                             </div>
                                         </div>
                                         <div className="bg-slate-50 rounded-lg p-2 space-y-2">
-                                            {res.games.map((game, i) => {
+                                            {res.games.map((game: any, i: number) => {
                                                 const cat = (resultsState.roundCategories?.[(schedule as any).currentRoundIndex] || []).find((c: any) => c.id === game.categoryId);
-                                                if (!game.teamASets && !game.teamBSets && !game.setScores.some(s => s.teamAPoints !== null)) return null;
+                                                if (!game.teamASets && !game.teamBSets && !game.setScores.some((s: any) => s.teamAPoints !== null)) return null;
                                                 return (
                                                     <div key={i} className="flex justify-between items-center text-[10px] font-bold">
                                                         <span className="text-slate-500 truncate max-w-[80px]">{cat?.name || 'Set'}</span>
@@ -153,41 +177,45 @@ export const LiveViewer: React.FC<LiveViewerProps> = ({ tournamentId }) => {
                     </div>
 
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
-                        <div className="min-w-[800px]">
-                            <EliminationBracketView 
-                                bracket={(schedule as any).bracket} 
-                                showResult={true} 
-                                getMatchScore={(roundIndex, matchIndex) => {
-                                    const history = (schedule as any).history || [];
-                                    if (roundIndex < history.length) {
-                                        const matchups = history[roundIndex];
-                                        if (matchups && matchups[matchIndex]) {
-                                            const matchId = matchups[matchIndex].id;
-                                            const res = resultsState.results[matchId];
-                                            if (res && res.isComplete) {
-                                                return { teamAScore: res.teamAMatchWins, teamBScore: res.teamBMatchWins };
-                                            }
-                                        }
+                        <EliminationBracketView 
+                            bracket={(schedule as any).bracket} 
+                            showResult={true} 
+                            onMatchClick={(matchId) => setViewState({ type: 'matchDetails', id: matchId })}
+                            getMatchScore={(roundIndex, matchIndex) => {
+                                const history = (schedule as any).history || [];
+                                let matchId: string | undefined = undefined;
+                                let res: any = undefined;
+
+                                if (roundIndex < history.length) {
+                                    const matchups = history[roundIndex];
+                                    if (matchups && matchups[matchIndex]) {
+                                        matchId = matchups[matchIndex].id;
+                                        res = resultsState.results[matchId];
                                     }
-                                    // Also show live scores for the CURRENT round in the bracket!
-                                    if (roundIndex === (schedule as any).currentRoundIndex) {
-                                        const matchups = (schedule as any).matchups;
-                                        if (matchups && matchups[matchIndex]) {
-                                            const matchId = matchups[matchIndex].id;
-                                            const res = resultsState.results[matchId];
-                                            if (res) {
-                                                return { teamAScore: res.teamAMatchWins, teamBScore: res.teamBMatchWins };
-                                            }
-                                        }
+                                } else if (roundIndex === (schedule as any).currentRoundIndex) {
+                                    const matchups = (schedule as any).matchups;
+                                    if (matchups && matchups[matchIndex]) {
+                                        matchId = matchups[matchIndex].id;
+                                        res = resultsState.results[matchId];
                                     }
-                                    return null;
-                                }}
-                            />
-                        </div>
+                                }
+
+                                if (!matchId) return null;
+                                return { 
+                                    teamAScore: res ? res.teamAMatchWins : undefined, 
+                                    teamBScore: res ? res.teamBMatchWins : undefined,
+                                    matchId 
+                                };
+                            }}
+                        />
                     </div>
                 </div>
             ) : (
-                <LiveGroupResults schedule={schedule as any} resultsState={resultsState} />
+                <LiveGroupResults 
+                    schedule={schedule as any} 
+                    resultsState={resultsState} 
+                    onViewGroup={(groupId) => setViewState({ type: 'groupMatchups', id: groupId })} 
+                />
             )}
 
             <footer className="text-center py-8 text-slate-400">
@@ -197,7 +225,7 @@ export const LiveViewer: React.FC<LiveViewerProps> = ({ tournamentId }) => {
     );
 };
 
-const LiveGroupResults: React.FC<{ schedule: any, resultsState: any }> = ({ schedule, resultsState }) => {
+const LiveGroupResults: React.FC<{ schedule: any, resultsState: any, onViewGroup: (groupId: string) => void }> = ({ schedule, resultsState, onViewGroup }) => {
     // Re-use logic for rankings
     const rankings = React.useMemo(() => {
         const { groupRankings } = computeRankings(schedule.matchups, resultsState.results, resultsState.rules || DEFAULT_RANKING_RULES);
@@ -208,8 +236,12 @@ const LiveGroupResults: React.FC<{ schedule: any, resultsState: any }> = ({ sche
         <div className="space-y-8">
             {Object.entries(rankings).map(([groupId, entries]: [string, any]) => (
                 <div key={groupId} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="bg-slate-50 p-4 border-b border-slate-200 font-black text-slate-700 flex justify-between">
+                    <div 
+                        onClick={() => onViewGroup(groupId)}
+                        className="bg-slate-50 p-4 border-b border-slate-200 font-black text-slate-700 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition group"
+                    >
                         <span>{entries[0]?.groupName || 'Group'} Ranking</span>
+                        <span className="text-xs text-brand-600 bg-brand-50 px-2 py-1 rounded group-hover:bg-brand-100 transition">View Matches →</span>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left whitespace-nowrap">
@@ -255,3 +287,155 @@ const LiveGroupResults: React.FC<{ schedule: any, resultsState: any }> = ({ sche
         </div>
     );
 };
+
+const LiveGroupMatchups: React.FC<{
+    groupId: string;
+    schedule: any;
+    resultsState: any;
+    onBack: () => void;
+    onMatchClick: (matchId: string) => void;
+}> = ({ groupId, schedule, resultsState, onBack, onMatchClick }) => {
+    const groupMatchups = schedule.matchups.filter((m: any) => m.groupId === groupId);
+    const groupName = schedule.groups.find((g: any) => g.id === groupId)?.name || 'Group';
+
+    return (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <button onClick={onBack} className="text-sm font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1 transition">
+                ← Back to Rankings
+            </button>
+            <div className="flex items-center gap-2 mb-1">
+                <span className="w-4 h-4 rounded-full bg-brand-500"></span>
+                <h2 className="text-2xl font-black text-slate-800">{groupName} Matchups</h2>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {groupMatchups.map((match: any) => {
+                    const res = resultsState.results[match.id] || { teamAMatchWins: 0, teamBMatchWins: 0 };
+                    return (
+                        <div key={match.id} 
+                            onClick={() => onMatchClick(match.id)}
+                            className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 cursor-pointer hover:border-brand-500 hover:shadow-md transition">
+                            <div className="flex justify-between items-center mb-3">
+                                <div className="text-right flex-1">
+                                    <div className="font-bold text-slate-800 text-sm truncate">
+                                        {match.teamA?.name || match.team1?.name || (schedule.teams?.find((t: any) => t.id === match.teamAId)?.name)}
+                                    </div>
+                                </div>
+                                <div className="px-3 text-[10px] font-black text-slate-300 italic">VS</div>
+                                <div className="text-left flex-1">
+                                    <div className="font-bold text-slate-800 text-sm truncate">
+                                        {match.teamB?.name || match.team2?.name || (schedule.teams?.find((t: any) => t.id === match.teamBId)?.name)}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="text-center font-black text-brand-600 bg-brand-50 rounded py-1">
+                                {res.games?.reduce((acc: number, g: any) => acc + (g.teamASets > g.teamBSets ? 1 : 0), 0) || 0} - {res.games?.reduce((acc: number, g: any) => acc + (g.teamBSets > g.teamASets ? 1 : 0), 0) || 0}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+const LiveMatchDetails: React.FC<{
+    matchId: string;
+    schedule: any;
+    resultsState: any;
+    onBack: () => void;
+}> = ({ matchId, schedule, resultsState, onBack }) => {
+    const isElimination = 'bracket' in schedule;
+    let match = null;
+    let roundIndex = 0;
+
+    if (isElimination) {
+        const history = schedule.history || [];
+        for (let r = 0; r < history.length; r++) {
+            const m = history[r].find((x: any) => x.id === matchId);
+            if (m) { match = m; roundIndex = r; break; }
+        }
+        if (!match && schedule.matchups) {
+            const m = schedule.matchups.find((x: any) => x.id === matchId);
+            if (m) { match = m; roundIndex = schedule.currentRoundIndex; }
+        }
+    } else {
+        match = schedule.matchups.find((x: any) => x.id === matchId);
+    }
+
+    if (!match) {
+        return <div className="text-center py-12"><p className="text-slate-500">Match not found.</p><button className="mt-4 text-brand-600 font-bold hover:underline" onClick={onBack}>Go back</button></div>;
+    }
+
+    const res = resultsState.results[matchId] || { games: [], teamAMatchWins: 0, teamBMatchWins: 0 };
+    const categories = isElimination 
+        ? (resultsState.roundCategories?.[roundIndex] || [])
+        : (resultsState.categories || []);
+
+    const team1Name = isElimination ? match.slot1?.team?.name : (match.teamA?.name || match.team1?.name);
+    const team1Org = isElimination ? match.slot1?.team?.organization : (match.teamA?.organization || match.team1?.organization);
+    const team2Name = isElimination ? match.slot2?.team?.name : (match.teamB?.name || match.team2?.name);
+    const team2Org = isElimination ? match.slot2?.team?.organization : (match.teamB?.organization || match.team2?.organization);
+
+    const validGames = res.games.filter((g: any) => categories.some((c: any) => c.id === g.categoryId));
+    const computedTeamAWins = isElimination ? res.teamAMatchWins : validGames.reduce((acc: number, g: any) => acc + (g.teamASets > g.teamBSets ? 1 : 0), 0);
+    const computedTeamBWins = isElimination ? res.teamBMatchWins : validGames.reduce((acc: number, g: any) => acc + (g.teamBSets > g.teamASets ? 1 : 0), 0);
+
+    return (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <button onClick={onBack} className="text-sm font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1 transition">
+                ← Back
+            </button>
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <div className="flex justify-between items-center mb-6">
+                    <div className="text-right flex-1 min-w-0">
+                        <div className="text-2xl md:text-3xl font-black text-slate-800 truncate">{team1Name || 'TBD'}</div>
+                        <div className="text-xs font-bold text-slate-400 mt-1 truncate">{team1Org || ''}</div>
+                    </div>
+                    <div className="px-4 md:px-8 text-xl font-black text-slate-300 italic">VS</div>
+                    <div className="text-left flex-1 min-w-0">
+                        <div className="text-2xl md:text-3xl font-black text-slate-800 truncate">{team2Name || 'TBD'}</div>
+                        <div className="text-xs font-bold text-slate-400 mt-1 truncate">{team2Org || ''}</div>
+                    </div>
+                </div>
+                
+                <div className="text-center font-black text-4xl text-brand-600 mb-8 pb-8 border-b border-slate-100">
+                    {computedTeamAWins} - {computedTeamBWins}
+                </div>
+
+                <div className="space-y-4 max-w-2xl mx-auto">
+                    {validGames.length === 0 && <p className="text-center text-slate-400 italic">No score recorded yet.</p>}
+                    {validGames.map((game: any, i: number) => {
+                        const cat = categories.find((c: any) => c.id === game.categoryId);
+                        return (
+                            <div key={i} className="bg-slate-50 rounded-lg p-4 md:p-6 border border-slate-200 min-h-[100px] flex flex-col items-center">
+                                <div className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">{cat?.name || 'Set'}</div>
+                                <div className="flex items-center gap-6 text-2xl font-black w-full justify-center">
+                                    <span className={`w-16 text-right ${game.teamASets > game.teamBSets ? 'text-brand-600' : 'text-slate-700'}`}>{game.teamASets}</span>
+                                    <span className="text-slate-300 px-4">-</span>
+                                    <span className={`w-16 text-left ${game.teamBSets > game.teamASets ? 'text-brand-600' : 'text-slate-700'}`}>{game.teamBSets}</span>
+                                </div>
+                                
+                                {game.setScores?.length > 0 && game.setScores.some((s:any) => s.teamAPoints !== null || s.teamBPoints !== null) && (
+                                    <div className="mt-6 pt-4 border-t border-slate-200/60 w-full flex flex-col items-center gap-2">
+                                        {game.setScores.map((score: any, si: number) => {
+                                            if (score.teamAPoints === null && score.teamBPoints === null) return null;
+                                            return (
+                                                <div key={si} className="flex gap-4 items-center text-sm font-medium">
+                                                    <span className="text-xs text-slate-400 w-16 text-right font-bold uppercase tracking-widest">Game {si+1}</span>
+                                                    <span className="w-8 text-right text-slate-800 text-lg font-bold">{score.teamAPoints ?? '-'}</span>
+                                                    <span className="text-slate-300">:</span>
+                                                    <span className="w-8 text-left text-slate-800 text-lg font-bold">{score.teamBPoints ?? '-'}</span>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+}

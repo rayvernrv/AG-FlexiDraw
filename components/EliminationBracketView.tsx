@@ -4,12 +4,14 @@ import { EliminationBracket, BracketSlot } from '../types';
 interface EliminationBracketViewProps {
     bracket: EliminationBracket;
     showResult?: boolean;
-    getMatchScore?: (roundIndex: number, matchIndex: number) => { teamAScore: number; teamBScore: number } | null;
+    getMatchScore?: (roundIndex: number, matchIndex: number) => { teamAScore?: number; teamBScore?: number; matchId?: string } | null;
+    onMatchClick?: (matchId: string) => void;
 }
 
 interface MatchScore {
-    teamAScore: number;
-    teamBScore: number;
+    teamAScore?: number;
+    teamBScore?: number;
+    matchId?: string;
 }
 
 interface MatchupData {
@@ -38,7 +40,7 @@ const getMatchups = (slots: BracketSlot[]): MatchupData[] => {
 };
 
 export const EliminationBracketView: React.FC<EliminationBracketViewProps> = ({
-    bracket, showResult = false, getMatchScore
+    bracket, showResult = false, getMatchScore, onMatchClick
 }) => {
     const totalSlots = bracket.totalSlots;
     const halfwayPoint = totalSlots / 2;
@@ -90,9 +92,16 @@ export const EliminationBracketView: React.FC<EliminationBracketViewProps> = ({
 
             {/* Mirrored Full Bracket View */}
             <div className="mt-8 pt-6 border-t border-slate-200">
-                <h4 className="font-bold text-slate-700 mb-4 text-center">Full Bracket View</h4>
-                <div className="overflow-x-auto">
-                    <MirroredBracketVisualization bracket={bracket} numRounds={numRounds} getMatchScore={getMatchScore} />
+                <h4 className="font-bold text-slate-700 mb-2 text-center">Full Bracket View</h4>
+                {onMatchClick && (
+                    <div className="text-center mb-6">
+                        <span className="text-xs font-bold text-brand-600 bg-brand-50 py-1.5 px-4 rounded-full border border-brand-100 shadow-sm animate-pulse-slow">
+                            👆 Click on any match to view detailed scores
+                        </span>
+                    </div>
+                )}
+                <div className="overflow-x-auto pb-4">
+                    <MirroredBracketVisualization bracket={bracket} numRounds={numRounds} getMatchScore={getMatchScore} onMatchClick={onMatchClick} />
                 </div>
             </div>
         </div>
@@ -142,10 +151,11 @@ const TeamSlot: React.FC<{ slot: BracketSlot | null }> = ({ slot }) => {
 interface MirroredBracketProps {
     bracket: EliminationBracket;
     numRounds: number;
-    getMatchScore?: (roundIndex: number, matchIndex: number) => { teamAScore: number; teamBScore: number } | null;
+    getMatchScore?: (roundIndex: number, matchIndex: number) => { teamAScore?: number; teamBScore?: number; matchId?: string } | null;
+    onMatchClick?: (matchId: string) => void;
 }
 
-const MirroredBracketVisualization: React.FC<MirroredBracketProps> = ({ bracket, numRounds, getMatchScore }) => {
+const MirroredBracketVisualization: React.FC<MirroredBracketProps> = ({ bracket, numRounds, getMatchScore, onMatchClick }) => {
     const totalSlots = bracket.totalSlots;
     const halfwayPoint = totalSlots / 2;
     // Base rounds mapping
@@ -186,7 +196,7 @@ const MirroredBracketVisualization: React.FC<MirroredBracketProps> = ({ bracket,
     }
 
     return (
-        <div className="flex items-stretch justify-center w-full p-4 gap-4 md:gap-8">
+        <div className="flex items-stretch w-full min-w-max mx-auto p-4 gap-2 md:gap-4 lg:gap-8">
             {/* ──── LEFT SIDE: Top Half (flows left → right) ──── */}
             {halfRoundStructure.map((round, ri) => {
                 const roundSlots = roundsData[ri];
@@ -195,13 +205,13 @@ const MirroredBracketVisualization: React.FC<MirroredBracketProps> = ({ bracket,
                 const topMatchups = topSlots ? getMatchups(topSlots) : [];
 
                 return (
-                    <div key={`left-${ri}`} className="flex flex-col justify-around w-32 md:w-48 shrink-0">
+                    <div key={`left-${ri}`} className="flex flex-col justify-around flex-1 min-w-[112px] md:min-w-[160px] max-w-[280px] shrink-0">
                         <div className="text-center text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">{round.name}</div>
                         <div className="flex flex-col justify-around flex-1">
                             {topMatchups.length > 0 ? (
                                 topMatchups.map((matchup, idx) => (
                                     <div key={idx} className="mb-2" style={{ marginTop: ri * 10, marginBottom: ri * 10 }}>
-                                        <MiniMatchupCard matchup={matchup} score={getMatchScore?.(ri, idx)} />
+                                        <MiniMatchupCard matchup={matchup} score={getMatchScore?.(ri, idx)} onMatchClick={onMatchClick} />
                                     </div>
                                 ))
                             ) : (
@@ -221,7 +231,7 @@ const MirroredBracketVisualization: React.FC<MirroredBracketProps> = ({ bracket,
                 <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 text-center">Final</div>
                 <div className="mb-6">
                     {roundsData[halfRounds] ? (
-                        <GrandMatchupCard matchup={getMatchups(roundsData[halfRounds])[0]} score={getMatchScore?.(halfRounds, 0)} />
+                        <GrandMatchupCard matchup={getMatchups(roundsData[halfRounds])[0]} score={getMatchScore?.(halfRounds, 0)} onMatchClick={onMatchClick} />
                     ) : (
                         <div className="border border-slate-200 rounded bg-slate-50 shadow-sm w-48">
                             <div className="px-2 py-3 text-sm font-bold text-slate-400 border-b border-slate-200 text-center">—</div>
@@ -243,13 +253,13 @@ const MirroredBracketVisualization: React.FC<MirroredBracketProps> = ({ bracket,
                 const bottomMatchups = bottomSlots ? getMatchups(bottomSlots) : [];
 
                 return (
-                    <div key={`right-${ri}`} className="flex flex-col justify-around w-32 md:w-48 shrink-0">
+                    <div key={`right-${ri}`} className="flex flex-col justify-around flex-1 min-w-[112px] md:min-w-[160px] max-w-[280px] shrink-0">
                         <div className="text-center text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">{round.name}</div>
                         <div className="flex flex-col justify-around flex-1">
                             {bottomMatchups.length > 0 ? (
                                 bottomMatchups.map((matchup, idx) => (
                                     <div key={idx} className="mb-2" style={{ marginTop: actualRoundIdx * 10, marginBottom: actualRoundIdx * 10 }}>
-                                        <MiniMatchupCard matchup={matchup} score={getMatchScore?.(actualRoundIdx, topMatchCount + idx)} />
+                                        <MiniMatchupCard matchup={matchup} score={getMatchScore?.(actualRoundIdx, topMatchCount + idx)} onMatchClick={onMatchClick} />
                                     </div>
                                 ))
                             ) : (
@@ -269,13 +279,19 @@ const MirroredBracketVisualization: React.FC<MirroredBracketProps> = ({ bracket,
 
 // ──── Mini Components ────
 
-const MiniMatchupCard: React.FC<{ matchup: MatchupData, score?: MatchScore | null }> = ({ matchup, score }) => (
-    <div className="border border-slate-200 rounded bg-white shadow-sm flex flex-col">
-        <MiniTeamSlot slot={matchup.slot1} score={score?.teamAScore} />
-        <div className="h-px bg-slate-200"></div>
-        <MiniTeamSlot slot={matchup.slot2} score={score?.teamBScore} />
-    </div>
-);
+const MiniMatchupCard: React.FC<{ matchup: MatchupData, score?: MatchScore | null, onMatchClick?: (matchId: string) => void }> = ({ matchup, score, onMatchClick }) => {
+    const isClickable = !!score?.matchId && !!onMatchClick;
+    return (
+        <div 
+            className={`border border-slate-200 rounded bg-white shadow-sm flex flex-col ${isClickable ? 'cursor-pointer hover:border-brand-500 hover:shadow-md transition' : ''}`}
+            onClick={() => { if (isClickable && score.matchId) onMatchClick(score.matchId); }}
+        >
+            <MiniTeamSlot slot={matchup.slot1} score={score?.teamAScore} />
+            <div className="h-px bg-slate-200"></div>
+            <MiniTeamSlot slot={matchup.slot2} score={score?.teamBScore} />
+        </div>
+    );
+};
 
 const MiniTeamSlot: React.FC<{ slot: BracketSlot | null, score?: number | null }> = ({ slot, score }) => {
     if (!slot || !slot.team) {
@@ -309,13 +325,19 @@ const EmptyMatchupCard: React.FC = () => (
     </div>
 );
 
-const GrandMatchupCard: React.FC<{ matchup: MatchupData, score?: MatchScore | null }> = ({ matchup, score }) => (
-    <div className="border-2 border-orange-300 rounded-xl bg-gradient-to-br from-white to-orange-50 shadow-md overflow-hidden min-w-[12rem] md:min-w-[16rem]">
-        <GrandTeamSlot slot={matchup.slot1} score={score?.teamAScore} />
-        <div className="h-0.5 bg-orange-200"></div>
-        <GrandTeamSlot slot={matchup.slot2} score={score?.teamBScore} />
-    </div>
-);
+const GrandMatchupCard: React.FC<{ matchup: MatchupData, score?: MatchScore | null, onMatchClick?: (matchId: string) => void }> = ({ matchup, score, onMatchClick }) => {
+    const isClickable = !!score?.matchId && !!onMatchClick;
+    return (
+        <div 
+            className={`border-2 border-orange-300 rounded-xl bg-gradient-to-br from-white to-orange-50 shadow-md overflow-hidden min-w-[12rem] md:min-w-[16rem] ${isClickable ? 'cursor-pointer hover:border-orange-500 hover:shadow-lg transition transform active:scale-95' : ''}`}
+            onClick={() => { if (isClickable && score.matchId) onMatchClick(score.matchId); }}
+        >
+            <GrandTeamSlot slot={matchup.slot1} score={score?.teamAScore} />
+            <div className="h-0.5 bg-orange-200"></div>
+            <GrandTeamSlot slot={matchup.slot2} score={score?.teamBScore} />
+        </div>
+    );
+};
 
 const GrandTeamSlot: React.FC<{ slot: BracketSlot | null, score?: number | null }> = ({ slot, score }) => {
     if (!slot || !slot.team) {
