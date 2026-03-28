@@ -46,7 +46,7 @@ export const exportGroupResultsToCSV = (
         const groupName = entries[0]?.groupName || 'Group';
         csv += `\n${escapeCSV(groupName)}\n`;
         csv += `Rank,Team,Org,GP,W,L,Set W,Set L,Set Diff,Pts W,Pts L,Pts Diff,DPG,Tiebreaker\n`;
-        
+
         entries.forEach((entry, idx) => {
             csv += [
                 idx + 1,
@@ -74,7 +74,7 @@ export const exportGroupResultsToCSV = (
     schedule.matchups.forEach(match => {
         const group = schedule.groups.find(g => g.id === match.groupId);
         const matchResult = results[match.id];
-        
+
         let winner = 'TBD';
         let score = '0 - 0';
         let details = '';
@@ -82,13 +82,13 @@ export const exportGroupResultsToCSV = (
         if (matchResult && matchResult.isComplete) {
             let teamAWins = 0;
             let teamBWins = 0;
-            
+
             const detailParts: string[] = [];
             matchResult.games.forEach(g => {
                 const cat = categories.find(c => c.id === g.categoryId);
                 const catName = cat?.name || 'Game';
                 detailParts.push(`${catName}: ${g.teamASets}-${g.teamBSets} (${g.teamAPoints}-${g.teamBPoints})`);
-                
+
                 if (g.teamASets > g.teamBSets) teamAWins++;
                 else if (g.teamBSets > g.teamASets) teamBWins++;
             });
@@ -158,7 +158,7 @@ export const exportEliminationResultsToCSV = (
                 else winner = 'Draw';
 
                 score = `${matchResult.teamAMatchWins} - ${matchResult.teamBMatchWins}`;
-                
+
                 const detailParts: string[] = [];
                 matchResult.games.forEach(g => {
                     const cat = cats.find(c => c.id === g.categoryId);
