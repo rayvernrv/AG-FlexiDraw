@@ -40,7 +40,7 @@ export const liveSyncService = {
     /**
      * Subscribe to real-time changes for a specific tournament
      */
-    subscribe(id: string, onUpdate: (data: LiveTournamentData) => void) {
+    subscribe(id: string, onUpdate: (data: LiveTournamentData | null) => void) {
         return supabase
             .channel(`tournament-${id}`)
             .on(
@@ -50,7 +50,26 @@ export const liveSyncService = {
                     onUpdate(payload.new.data as LiveTournamentData);
                 }
             )
+            .on(
+                'postgres_changes',
+                { event: 'DELETE', schema: 'public', table: 'live_tournaments', filter: `id=eq.${id}` },
+                () => {
+                    onUpdate(null); // Signal that it's gone
+                }
+            )
             .subscribe();
+    },
+
+    /**
+     * Terminate a live tournament (delete from Supabase)
+     */
+    async terminateTournament(id: string) {
+        const { error } = await supabase
+            .from('live_tournaments')
+            .delete()
+            .eq('id', id);
+        
+        if (error) throw error;
     },
 
     /**

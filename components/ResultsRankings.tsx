@@ -3,6 +3,7 @@ import { SavedMatchupSchedule, GameCategory, MatchResult, GameResult, RankingRul
 import { loadMatchupSchedules, loadResultsState, saveResultsState, clearResultsState, updateMatchupSchedule, deleteMatchupSchedule } from '../services/storageService';
 import { computeRankings, DEFAULT_RANKING_RULES } from '../services/rankingEngine';
 import { exportGroupResultsToCSV } from '../services/exportService';
+import { liveSyncService } from '../services/liveSyncService';
 import { LiveLink } from './LiveLink';
 
 export const ResultsRankings: React.FC = () => {
@@ -273,7 +274,10 @@ export const ResultsRankings: React.FC = () => {
                         ) : showDeleteConfirm ? (
                             <div className="flex gap-3 items-center bg-red-50 px-3 py-1.5 rounded-lg border border-red-200">
                                 <span className="text-sm font-bold text-red-700">Are you sure?</span>
-                                <button type="button" onClick={() => {
+                                <button type="button" onClick={async () => {
+                                    if (activeSchedule?.liveId) {
+                                        try { await liveSyncService.terminateTournament(activeSchedule.liveId); } catch(e) { console.error(e); }
+                                    }
                                     deleteMatchupSchedule(activeScheduleId);
                                     clearResultsState(activeScheduleId);
                                     setSchedules(loadMatchupSchedules());

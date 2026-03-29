@@ -3,6 +3,7 @@ import { EliminationBracket, SavedEliminationSchedule, GameCategory, MatchResult
 import { loadEliminationSchedules, saveEliminationSchedule, updateEliminationSchedule, deleteEliminationSchedule, loadResultsState, saveResultsState, clearResultsState } from '../services/storageService';
 import { EliminationBracketView } from './EliminationBracketView';
 import { exportEliminationResultsToCSV } from '../services/exportService';
+import { liveSyncService } from '../services/liveSyncService';
 import { LiveLink } from './LiveLink';
 
 export const EliminationMatchManager: React.FC = () => {
@@ -456,7 +457,10 @@ export const EliminationMatchManager: React.FC = () => {
                         ) : showDeleteConfirm ? (
                             <div className="flex gap-3 items-center bg-red-50 px-3 py-1.5 rounded-lg border border-red-200">
                                 <span className="text-sm font-bold text-red-700">Are you sure?</span>
-                                <button type="button" onClick={() => {
+                                <button type="button" onClick={async () => {
+                                    if (activeSchedule?.liveId) {
+                                        try { await liveSyncService.terminateTournament(activeSchedule.liveId); } catch(e) { console.error(e); }
+                                    }
                                     deleteEliminationSchedule(activeScheduleId);
                                     clearResultsState(activeScheduleId);
                                     setSchedules(loadEliminationSchedules());

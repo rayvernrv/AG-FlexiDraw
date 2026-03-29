@@ -13,6 +13,7 @@ import { generateMatchups } from './services/matchupEngine';
 import { saveMatchupSchedule, loadMatchupSchedules, deleteMatchupSchedule, updateMatchupSchedule, loadEliminationSchedules, saveEliminationSchedule, clearResultsState } from './services/storageService';
 import { ResultsRankings } from './components/ResultsRankings';
 import { EliminationMatchManager } from './components/EliminationMatchManager';
+import { liveSyncService } from './services/liveSyncService';
 import { LiveViewer } from './components/LiveViewer';
 
 // Helper to generate initial elimination bracket
@@ -711,7 +712,10 @@ const App = () => {
                                       {deletingScheduleId === s.id ? (
                                         <div className="flex gap-2 items-center bg-red-50 px-2 py-0.5 rounded border border-red-200">
                                           <span className="text-xs font-bold text-red-700">Sure?</span>
-                                          <button type="button" onClick={() => {
+                                          <button type="button" onClick={async () => {
+                                            if (s.liveId) {
+                                              try { await liveSyncService.terminateTournament(s.liveId); } catch(e) { console.error(e); }
+                                            }
                                             deleteMatchupSchedule(s.id);
                                             clearResultsState(s.id);
                                             setSavedSchedules(loadMatchupSchedules());

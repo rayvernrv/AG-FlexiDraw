@@ -31,7 +31,17 @@ export const LiveViewer: React.FC<LiveViewerProps> = ({ tournamentId }) => {
                     
                     // Subscribe to real-time updates
                     subscription = liveSyncService.subscribe(tournamentId, (updatedData) => {
-                        setData(updatedData);
+                        if (updatedData === null) {
+                            // Tournament was deleted
+                            setData(null);
+                            setError('The live stream for this tournament has been ended by the organizer.');
+                            if (subscription) {
+                                subscription.unsubscribe();
+                                subscription = null;
+                            }
+                        } else {
+                            setData(updatedData);
+                        }
                     });
                 } else {
                     setError('Tournament not found or is no longer live.');
