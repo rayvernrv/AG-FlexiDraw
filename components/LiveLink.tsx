@@ -57,6 +57,22 @@ export const LiveLink: React.FC<LiveLinkProps> = ({
         setTimeout(() => setCopySuccess(false), 2000);
     };
 
+    const handleTerminate = async () => {
+        if (!currentLiveId) return;
+        if (!confirm("Are you sure you want to stop live sync? This will kill the live link for everyone!")) return;
+        
+        setIsPublishing(true);
+        try {
+            await liveSyncService.terminateTournament(currentLiveId);
+            onLiveIdCreated(''); // Clear liveId using callback
+        } catch (err) {
+            setError('Failed to stop sync.');
+            console.error(err);
+        } finally {
+            setIsPublishing(false);
+        }
+    };
+
     return (
         <div className={`p-4 rounded-xl border-2 transition-all duration-300 ${
             currentLiveId ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-200'
@@ -77,7 +93,7 @@ export const LiveLink: React.FC<LiveLinkProps> = ({
                     {currentLiveId ? (
                         <>
                             <div className="flex bg-white rounded-lg border border-green-200 overflow-hidden shadow-sm">
-                                <div className="px-3 py-2 text-xs font-mono text-slate-400 select-all overflow-hidden max-w-[200px] whitespace-nowrap">
+                                <div className="px-3 py-2 text-xs font-mono text-slate-400 select-all overflow-hidden max-w-[150px] lg:max-w-[250px] whitespace-nowrap">
                                     {liveUrl}
                                 </div>
                                 <button 
@@ -95,6 +111,16 @@ export const LiveLink: React.FC<LiveLinkProps> = ({
                             >
                                 <svg className={`w-4 h-4 ${isPublishing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                </svg>
+                            </button>
+                            <button 
+                                onClick={handleTerminate}
+                                disabled={isPublishing}
+                                className="bg-red-50 border border-red-200 text-red-600 p-2 rounded-lg hover:bg-red-100 transition shadow-sm"
+                                title="Stop Live"
+                            >
+                                <svg className="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0zM8.5 9.5v5a.5.5 0 00.5.5h5a.5.5 0 00.5-.5v-5a.5.5 0 00-.5-.5h-5a.5.5 0 00-.5.5z" />
                                 </svg>
                             </button>
                         </>
