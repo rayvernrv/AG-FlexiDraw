@@ -107,11 +107,8 @@ export const ResultsRankings: React.FC = () => {
 
     const handleClearData = () => {
         if (!activeScheduleId) return;
-        if (confirm('Are you sure you want to clear all recorded results and categories for this schedule?')) {
-            clearResultsState(activeScheduleId);
-            setCategories([]);
+        if (confirm('Are you sure you want to clear all recorded results for this group stage?')) {
             setResults({});
-            setRules(DEFAULT_RANKING_RULES);
         }
     };
 
@@ -241,23 +238,8 @@ export const ResultsRankings: React.FC = () => {
                     </select>
                 )}
 
-                {activeSchedule && (
-                    <div className="mt-6">
-                        <LiveLink 
-                            name={activeSchedule.name}
-                            type="group"
-                            schedule={activeSchedule}
-                            resultsState={{ categories, results, rules }}
-                            currentLiveId={activeSchedule.liveId}
-                            onLiveIdCreated={(id) => {
-                                updateMatchupSchedule(activeSchedule.id, { ...activeSchedule, liveId: id });
-                                setSchedules(loadMatchupSchedules());
-                            }}
-                        />
-                    </div>
-                )}
-                {activeScheduleId && (
-                    <div className="mt-4">
+                {activeScheduleId && activeSchedule && (
+                    <div className="mt-4 mb-6">
                         {editingScheduleId === activeScheduleId ? (
                             <div className="flex gap-2 w-full md:w-1/2">
                                 <input type="text" className="p-2 border rounded-lg flex-1" value={editingScheduleName} onChange={e => setEditingScheduleName(e.target.value)} />
@@ -273,7 +255,7 @@ export const ResultsRankings: React.FC = () => {
                             </div>
                         ) : showDeleteConfirm ? (
                             <div className="flex gap-3 items-center bg-red-50 px-3 py-1.5 rounded-lg border border-red-200">
-                                <span className="text-sm font-bold text-red-700">Are you sure?</span>
+                                <span className="text-sm font-bold text-red-700">Are you sure you want to delete this saved matchup?</span>
                                 <button type="button" onClick={async () => {
                                     if (activeSchedule?.liveId) {
                                         try { await liveSyncService.terminateTournament(activeSchedule.liveId); } catch(e) { console.error(e); }
@@ -292,6 +274,21 @@ export const ResultsRankings: React.FC = () => {
                                 <button type="button" onClick={(e) => { e.preventDefault(); setShowDeleteConfirm(true); }} className="text-red-600 font-semibold hover:underline px-3 py-1.5 text-sm border bg-red-50 border-red-200 rounded-lg">Delete</button>
                             </div>
                         )}
+                    </div>
+                )}
+                {activeSchedule && (
+                    <div className="mt-4">
+                        <LiveLink 
+                            name={activeSchedule.name}
+                            type="group"
+                            schedule={activeSchedule}
+                            resultsState={{ categories, results, rules }}
+                            currentLiveId={activeSchedule.liveId}
+                            onLiveIdCreated={(id) => {
+                                updateMatchupSchedule(activeSchedule.id, { ...activeSchedule, liveId: id });
+                                setSchedules(loadMatchupSchedules());
+                            }}
+                        />
                     </div>
                 )}
             </div>
