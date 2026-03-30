@@ -20,9 +20,12 @@ const downloadCSV = (filename: string, csvContent: string) => {
 /**
  * Escapes a string for CSV format.
  */
-const escapeCSV = (str: string | number | null | undefined) => {
+const escapeCSV = (str: string | number | null | undefined, preventDateFormatting = false) => {
     if (str === null || str === undefined) return '';
     const s = String(str);
+    if (preventDateFormatting && s.includes(' - ')) {
+        return `="${s}"`;
+    }
     if (s.includes(',') || s.includes('"') || s.includes('\n')) {
         return `"${s.replace(/"/g, '""')}"`;
     }
@@ -106,7 +109,7 @@ export const exportGroupResultsToCSV = (
             escapeCSV(match.teamA.name),
             escapeCSV(match.teamB.name),
             escapeCSV(winner),
-            escapeCSV(score),
+            escapeCSV(score, true),
             escapeCSV(details)
         ].join(',') + '\n';
     });
@@ -175,7 +178,7 @@ export const exportEliminationResultsToCSV = (
                 escapeCSV(roundName),
                 escapeCSV(`${match.slot1.team?.name || 'TBD'} vs ${match.slot2.team?.name || 'TBD'}`),
                 escapeCSV(winner),
-                escapeCSV(score),
+                escapeCSV(score, true),
                 escapeCSV(details)
             ].join(',') + '\n';
         });

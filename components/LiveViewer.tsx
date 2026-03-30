@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { liveSyncService, LiveTournamentData } from '../services/liveSyncService';
 import { EliminationBracketView } from './EliminationBracketView';
 import { computeRankings, DEFAULT_RANKING_RULES } from '../services/rankingEngine';
@@ -18,15 +18,44 @@ export const LiveViewer: React.FC<LiveViewerProps> = ({ tournamentId }) => {
         id?: string;
     }>({ type: 'home' });
 
+    const [isDisconnected, setIsDisconnected] = useState(false);
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    const resetInactivityTimeout = useCallback(() => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        // 10 minutes = 10 * 60 * 1000 = 600000 ms
+        timeoutRef.current = setTimeout(() => {
+            setIsDisconnected(true);
+        }, 600000);
+    }, []);
+
+    useEffect(() => {
+        if (isDisconnected) return; // Stop listening if disconnected
+
+        const events = ['mousemove', 'mousedown', 'keypress', 'touchstart', 'scroll'];
+        const handleActivity = () => resetInactivityTimeout();
+
+        events.forEach(e => window.addEventListener(e, handleActivity));
+        resetInactivityTimeout(); // Init timer
+
+        return () => {
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+            events.forEach(e => window.removeEventListener(e, handleActivity));
+        };
+    }, [isDisconnected, resetInactivityTimeout]);
+
     const goHome = () => setViewState({ type: 'home' });
 
     useEffect(() => {
         let subscription: { unsubscribe: () => void } | null = null;
+        let isMounted = true;
 
         const loadData = async () => {
+            if (isDisconnected) return;
+
             try {
                 const initialData = await liveSyncService.fetchTournament(tournamentId);
-                if (initialData) {
+                if (initialData && isMounted) {
                     setData(initialData);
                     
                     // Subscribe to real-time updates
@@ -43,23 +72,50 @@ export const LiveViewer: React.FC<LiveViewerProps> = ({ tournamentId }) => {
                             setData(updatedData);
                         }
                     });
-                } else {
+                } else if (isMounted) {
                     setError('Tournament not found or is no longer live.');
                 }
             } catch (err) {
-                setError('Failed to connect to live services.');
-                console.error(err);
+                if (isMounted) {
+                    setError('Failed to connect to live services.');
+                    console.error(err);
+                }
             } finally {
-                setLoading(false);
+                if (isMounted) setLoading(false);
             }
         };
 
         loadData();
 
         return () => {
+            isMounted = false;
             if (subscription) subscription.unsubscribe();
         };
-    }, [tournamentId]);
+    }, [tournamentId, isDisconnected]);
+
+    if (isDisconnected) {
+        return (
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-8 text-center my-12 mx-auto max-w-2xl shadow-sm">
+                <span className="text-4xl block mb-4">💤</span>
+                <h2 className="text-xl font-bold text-slate-800 mb-2">Connection Paused</h2>
+                <p className="text-slate-600 mb-6">Live updates have been paused due to 10 minutes of inactivity to save data.</p>
+                <div className="flex flex-wrap justify-center gap-4">
+                    <button 
+                        onClick={() => window.location.reload()}
+                        className="bg-brand-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-brand-700 transition shadow"
+                    >
+                        Reconnect & Resume
+                    </button>
+                    <button 
+                        onClick={() => window.location.href = window.location.pathname}
+                        className="bg-white border border-slate-200 text-slate-600 px-6 py-2 rounded-lg font-bold hover:bg-slate-50 transition"
+                    >
+                        Exit Live View
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     if (loading) {
         return (
@@ -88,6 +144,22 @@ export const LiveViewer: React.FC<LiveViewerProps> = ({ tournamentId }) => {
 
     const { schedule, resultsState } = data;
     const isElimination = 'bracket' in schedule;
+
+    let roundName = "Match In Progress";
+    if (isElimination) {
+        const totalTeams = (schedule as any).bracket.slots?.length || 0;
+        const totalRounds = totalTeams > 0 ? Math.ceil(Math.log2(totalTeams)) : 0;
+        const roundsRemaining = totalRounds - ((schedule as any).currentRoundIndex || 0);
+        switch (roundsRemaining) {
+            case 1: roundName = "Finals"; break;
+            case 2: roundName = "Semi Finals"; break;
+            case 3: roundName = "Quarter Finals"; break;
+            case 4: roundName = "Round of 16"; break;
+            case 5: roundName = "Round of 32"; break;
+            case 6: roundName = "Round of 64"; break;
+            default: roundName = `Round ${((schedule as any).currentRoundIndex || 0) + 1}`; break;
+        }
+    }
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -147,18 +219,18 @@ export const LiveViewer: React.FC<LiveViewerProps> = ({ tournamentId }) => {
                                         onClick={() => setViewState({ type: 'matchDetails', id: matchId })}
                                         className="bg-white p-4 rounded-xl border-l-4 border-l-brand-500 shadow-sm border border-slate-200 animate-pulse-slow cursor-pointer hover:border-brand-500 hover:shadow-md transition">
                                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex justify-between">
-                                            <span>Match In Progress</span>
+                                            <span>{roundName}</span>
                                             <span className="text-brand-600">Live</span>
                                         </div>
                                         <div className="flex justify-between items-center mb-3">
-                                            <div className="text-right flex-1">
-                                                <div className="font-black text-slate-800 text-sm truncate">{match.slot1.team?.name || 'TBD'}</div>
-                                                <div className="text-[10px] text-slate-400 font-bold">{match.slot1.team?.organization || ''}</div>
+                                            <div className="text-right flex-1 min-w-0">
+                                                <div className="font-black text-slate-800 text-xs md:text-sm line-clamp-2 leading-tight break-words">{match.slot1.team?.name || 'TBD'}</div>
+                                                <div className="text-[10px] text-slate-400 font-bold truncate">{match.slot1.team?.organization || ''}</div>
                                             </div>
-                                            <div className="px-4 text-xs font-black text-slate-300 italic">VS</div>
-                                            <div className="text-left flex-1">
-                                                <div className="font-black text-slate-800 text-sm truncate">{match.slot2.team?.name || 'TBD'}</div>
-                                                <div className="text-[10px] text-slate-400 font-bold">{match.slot2.team?.organization || ''}</div>
+                                            <div className="px-2 md:px-4 text-[10px] md:text-xs font-black text-slate-300 italic shrink-0">VS</div>
+                                            <div className="text-left flex-1 min-w-0">
+                                                <div className="font-black text-slate-800 text-xs md:text-sm line-clamp-2 leading-tight break-words">{match.slot2.team?.name || 'TBD'}</div>
+                                                <div className="text-[10px] text-slate-400 font-bold truncate">{match.slot2.team?.organization || ''}</div>
                                             </div>
                                         </div>
                                         <div className="bg-slate-50 rounded-lg p-2 space-y-2">
@@ -326,14 +398,14 @@ const LiveGroupMatchups: React.FC<{
                             onClick={() => onMatchClick(match.id)}
                             className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 cursor-pointer hover:border-brand-500 hover:shadow-md transition">
                             <div className="flex justify-between items-center mb-3">
-                                <div className="text-right flex-1">
-                                    <div className="font-bold text-slate-800 text-sm truncate">
+                                <div className="text-right flex-1 min-w-0">
+                                    <div className="font-bold text-slate-800 text-xs md:text-sm line-clamp-2 leading-tight break-words">
                                         {match.teamA?.name || match.team1?.name || (schedule.teams?.find((t: any) => t.id === match.teamAId)?.name)}
                                     </div>
                                 </div>
-                                <div className="px-3 text-[10px] font-black text-slate-300 italic">VS</div>
-                                <div className="text-left flex-1">
-                                    <div className="font-bold text-slate-800 text-sm truncate">
+                                <div className="px-2 md:px-3 text-[10px] font-black text-slate-300 italic shrink-0">VS</div>
+                                <div className="text-left flex-1 min-w-0">
+                                    <div className="font-bold text-slate-800 text-xs md:text-sm line-clamp-2 leading-tight break-words">
                                         {match.teamB?.name || match.team2?.name || (schedule.teams?.find((t: any) => t.id === match.teamBId)?.name)}
                                     </div>
                                 </div>
@@ -399,12 +471,12 @@ const LiveMatchDetails: React.FC<{
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <div className="flex justify-between items-center mb-6">
                     <div className="text-right flex-1 min-w-0">
-                        <div className="text-2xl md:text-3xl font-black text-slate-800 truncate">{team1Name || 'TBD'}</div>
+                        <div className="text-xl md:text-2xl font-black text-slate-800 line-clamp-2 md:line-clamp-3 leading-tight break-words">{team1Name || 'TBD'}</div>
                         <div className="text-xs font-bold text-slate-400 mt-1 truncate">{team1Org || ''}</div>
                     </div>
-                    <div className="px-4 md:px-8 text-xl font-black text-slate-300 italic">VS</div>
+                    <div className="px-4 md:px-8 text-xl font-black text-slate-300 italic shrink-0">VS</div>
                     <div className="text-left flex-1 min-w-0">
-                        <div className="text-2xl md:text-3xl font-black text-slate-800 truncate">{team2Name || 'TBD'}</div>
+                        <div className="text-xl md:text-2xl font-black text-slate-800 line-clamp-2 md:line-clamp-3 leading-tight break-words">{team2Name || 'TBD'}</div>
                         <div className="text-xs font-bold text-slate-400 mt-1 truncate">{team2Org || ''}</div>
                     </div>
                 </div>
