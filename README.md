@@ -50,7 +50,7 @@ This is the starting point for both draw modes.
     *   **Fixed/Lock:** Click 🔓/🔒 to lock a team to a slot. Fixed teams stay put during the random draw.
 *   **Capacity Validation:** Team count must match the selected bracket size.
 
-#### 3. Rules Stage (Obsoleted)
+#### 3. Rules Stage
 *   **Half Separation:** Ensure specific teams are in different halves (Top/Bottom), preventing them from meeting until the Final.
 *   **Team Lock:** Force a team into a specific bracket slot.
 
