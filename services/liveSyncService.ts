@@ -17,23 +17,26 @@ export const liveSyncService = {
     /**
      * Publish a new live tournament or update if id exists
      */
-    async publishTournament(name: string, type: 'group' | 'elimination', data: LiveTournamentData, existingId?: string) {
-        if (existingId) {
+    async publishTournament(name: string, type: 'group' | 'elimination', data: LiveTournamentData, existingId?: string, secretKey?: string) {
+        if (existingId && secretKey) {
             const { error } = await supabase
                 .from('live_tournaments')
                 .update({ name, type, data, updated_at: new Date().toISOString() })
-                .eq('id', existingId);
+                .eq('id', existingId)
+                .eq('secret_key', secretKey);
             
             if (error) throw error;
-            return existingId;
+            return { id: existingId, secret: secretKey };
         } else {
+            // New tournament - Supabase will generate a secret_key via default value
             const { data: inserted, error } = await supabase
                 .from('live_tournaments')
                 .insert([{ name, type, data }])
-                .select();
+                .select('id, secret_key')
+                .single();
             
             if (error) throw error;
-            return inserted[0].id;
+            return { id: inserted.id, secret: inserted.secret_key };
         }
     },
 
@@ -63,11 +66,12 @@ export const liveSyncService = {
     /**
      * Terminate a live tournament (delete from Supabase)
      */
-    async terminateTournament(id: string) {
+    async terminateTournament(id: string, secretKey: string) {
         const { error } = await supabase
             .from('live_tournaments')
             .delete()
-            .eq('id', id);
+            .eq('id', id)
+            .eq('secret_key', secretKey);
         
         if (error) throw error;
     },
