@@ -8,11 +8,12 @@ interface LiveLinkProps {
     schedule: SavedMatchupSchedule | SavedEliminationSchedule;
     resultsState: ResultsState;
     currentLiveId?: string;
-    onLiveIdCreated: (id: string) => void;
+    currentLiveSecret?: string;
+    onLiveSyncCreated: (id: string, secret: string) => void;
 }
 
 export const LiveLink: React.FC<LiveLinkProps> = ({ 
-    name, type, schedule, resultsState, currentLiveId, onLiveIdCreated 
+    name, type, schedule, resultsState, currentLiveId, currentLiveSecret, onLiveSyncCreated 
 }) => {
     const [isPublishing, setIsPublishing] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -20,27 +21,27 @@ export const LiveLink: React.FC<LiveLinkProps> = ({
 
     // Auto-sync effect
     React.useEffect(() => {
-        if (!currentLiveId) return;
+        if (!currentLiveId || !currentLiveSecret) return;
 
         const timeoutId = setTimeout(async () => {
             try {
                 const data: LiveTournamentData = { schedule, resultsState };
-                await liveSyncService.publishTournament(name, type, data, currentLiveId);
+                await liveSyncService.publishTournament(name, type, data, currentLiveId, currentLiveSecret);
             } catch (err) {
                 console.error("Auto-sync failed:", err);
             }
         }, 2000); // 2 second debounce
 
         return () => clearTimeout(timeoutId);
-    }, [schedule, resultsState, currentLiveId, name, type]);
+    }, [schedule, resultsState, currentLiveId, currentLiveSecret, name, type]);
 
     const handlePublish = async () => {
         setIsPublishing(true);
         setError(null);
         try {
             const data: LiveTournamentData = { schedule, resultsState };
-            const id = await liveSyncService.publishTournament(name, type, data, currentLiveId);
-            onLiveIdCreated(id);
+            const { id, secret } = await liveSyncService.publishTournament(name, type, data, currentLiveId, currentLiveSecret);
+            onLiveSyncCreated(id, secret || '');
         } catch (err) {
             setError('Failed to publish. Check your connection.');
             console.error(err);
@@ -58,13 +59,13 @@ export const LiveLink: React.FC<LiveLinkProps> = ({
     };
 
     const handleTerminate = async () => {
-        if (!currentLiveId) return;
+        if (!currentLiveId || !currentLiveSecret) return;
         if (!confirm("Are you sure you want to stop live sync? This will kill the live link for everyone!")) return;
         
         setIsPublishing(true);
         try {
-            await liveSyncService.terminateTournament(currentLiveId);
-            onLiveIdCreated(''); // Clear liveId using callback
+            await liveSyncService.terminateTournament(currentLiveId, currentLiveSecret);
+            onLiveSyncCreated('', ''); // Clear using callback
         } catch (err) {
             setError('Failed to stop sync.');
             console.error(err);

@@ -97,6 +97,7 @@ export interface SavedEliminationSchedule {
   isComplete: boolean;
   history?: EliminationMatchup[][]; // Stores matchups of past rounds
   liveId?: string;
+  liveSecret?: string;
 }
 
 export interface Matchup {
@@ -116,6 +117,7 @@ export interface SavedMatchupSchedule {
   matchups: Matchup[];
   roundRobinCount: number;
   liveId?: string;
+  liveSecret?: string;
 }
 
 // ==================== RESULTS & RANKINGS TYPES ====================

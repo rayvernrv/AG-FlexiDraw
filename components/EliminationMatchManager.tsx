@@ -452,8 +452,8 @@ export const EliminationMatchManager: React.FC = () => {
                             <div className="flex gap-3 items-center bg-red-50 px-3 py-1.5 rounded-lg border border-red-200">
                                 <span className="text-sm font-bold text-red-700">Are you sure you want to delete this saved matchup?</span>
                                 <button type="button" onClick={async () => {
-                                    if (activeSchedule?.liveId) {
-                                        try { await liveSyncService.terminateTournament(activeSchedule.liveId); } catch(e) { console.error(e); }
+                                    if (activeSchedule?.liveId && activeSchedule?.liveSecret) {
+                                        try { await liveSyncService.terminateTournament(activeSchedule.liveId, activeSchedule.liveSecret); } catch(e) { console.error(e); }
                                     }
                                     deleteEliminationSchedule(activeScheduleId);
                                     clearResultsState(activeScheduleId);
@@ -479,8 +479,9 @@ export const EliminationMatchManager: React.FC = () => {
                             schedule={activeSchedule}
                             resultsState={{ roundCategories, results, rules: [] }}
                             currentLiveId={activeSchedule.liveId}
-                            onLiveIdCreated={(id) => {
-                                updateEliminationSchedule(activeSchedule.id, { ...activeSchedule, liveId: id });
+                            currentLiveSecret={activeSchedule.liveSecret}
+                            onLiveSyncCreated={(id, secret) => {
+                                updateEliminationSchedule(activeSchedule.id, { ...activeSchedule, liveId: id, liveSecret: secret });
                                 setSchedules(loadEliminationSchedules());
                             }}
                         />

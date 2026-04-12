@@ -243,13 +243,13 @@ export const ResultsRankings: React.FC = () => {
                         {editingScheduleId === activeScheduleId ? (
                             <div className="flex gap-2 w-full md:w-1/2">
                                 <input type="text" className="p-2 border rounded-lg flex-1" value={editingScheduleName} onChange={e => setEditingScheduleName(e.target.value)} />
-                                <button type="button" onClick={(e) => { 
+                                <button type="button" onClick={(e) => {
                                     e.preventDefault();
                                     if (activeSchedule) {
-                                        updateMatchupSchedule(activeScheduleId, { ...activeSchedule, name: editingScheduleName }); 
-                                        setSchedules(loadMatchupSchedules()); 
+                                        updateMatchupSchedule(activeScheduleId, { ...activeSchedule, name: editingScheduleName });
+                                        setSchedules(loadMatchupSchedules());
                                     }
-                                    setEditingScheduleId(null); 
+                                    setEditingScheduleId(null);
                                 }} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm">Save</button>
                                 <button type="button" onClick={(e) => { e.preventDefault(); setEditingScheduleId(null); }} className="bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-bold text-sm">Cancel</button>
                             </div>
@@ -257,8 +257,8 @@ export const ResultsRankings: React.FC = () => {
                             <div className="flex gap-3 items-center bg-red-50 px-3 py-1.5 rounded-lg border border-red-200">
                                 <span className="text-sm font-bold text-red-700">Are you sure you want to delete this saved matchup?</span>
                                 <button type="button" onClick={async () => {
-                                    if (activeSchedule?.liveId) {
-                                        try { await liveSyncService.terminateTournament(activeSchedule.liveId); } catch(e) { console.error(e); }
+                                    if (activeSchedule?.liveId && activeSchedule?.liveSecret) {
+                                        try { await liveSyncService.terminateTournament(activeSchedule.liveId, activeSchedule.liveSecret); } catch (e) { console.error(e); }
                                     }
                                     deleteMatchupSchedule(activeScheduleId);
                                     clearResultsState(activeScheduleId);
@@ -278,14 +278,15 @@ export const ResultsRankings: React.FC = () => {
                 )}
                 {activeSchedule && (
                     <div className="mt-4">
-                        <LiveLink 
+                        <LiveLink
                             name={activeSchedule.name}
                             type="group"
                             schedule={activeSchedule}
                             resultsState={{ categories, results, rules }}
                             currentLiveId={activeSchedule.liveId}
-                            onLiveIdCreated={(id) => {
-                                updateMatchupSchedule(activeSchedule.id, { ...activeSchedule, liveId: id });
+                            currentLiveSecret={activeSchedule.liveSecret}
+                            onLiveSyncCreated={(id, secret) => {
+                                updateMatchupSchedule(activeSchedule.id, { ...activeSchedule, liveId: id, liveSecret: secret });
                                 setSchedules(loadMatchupSchedules());
                             }}
                         />
@@ -416,7 +417,7 @@ export const ResultsRankings: React.FC = () => {
                                 <div className="flex justify-between items-start mb-6 sticky top-24 bg-white z-10 py-2 border-b border-white">
                                     <div className="flex flex-col gap-2">
                                         <h2 className="text-xl font-bold text-slate-800">4. Live Rankings</h2>
-                                        <button 
+                                        <button
                                             onClick={() => activeSchedule && exportGroupResultsToCSV(activeSchedule, results, groupRankings, categories)}
                                             className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm transition flex items-center gap-2"
                                         >
@@ -518,9 +519,9 @@ const DecimalInput: React.FC<{ value: number | null, onChange: (val: number | nu
             setLocal(String(value));
         }
     }, [value]);
-    
-    return <input type="number" step="1" min="0" className="w-16 p-1 border rounded text-center font-mono focus:ring-2 focus:ring-brand-500 outline-none" 
-        value={local} 
+
+    return <input type="number" step="1" min="0" className="w-16 p-1 border rounded text-center font-mono focus:ring-2 focus:ring-brand-500 outline-none"
+        value={local}
         onKeyDown={e => {
             if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E' || e.key === '.') {
                 e.preventDefault();
@@ -531,6 +532,6 @@ const DecimalInput: React.FC<{ value: number | null, onChange: (val: number | nu
             if (v !== '' && !/^\d+$/.test(v)) return;
             setLocal(v);
             onChange(v === '' ? null : parseInt(v, 10));
-        }} 
+        }}
     />;
 };
